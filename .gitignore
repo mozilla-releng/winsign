@@ -1,0 +1,12 @@
+__pycache__/
+build/
+dist/
+*.py[co]
+*.egg-info
+
+.coverage
+.tox
+.eggs
+.python-version
+*.so
+*.o
