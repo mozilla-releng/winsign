@@ -12,6 +12,7 @@ from winsign.sign import (
     get_authenticode_signature,
     get_signatures_from_certificates,
 )
+from winsign.verify import verify_pefile
 from winsign.x509 import decode_key, load_pem_cert
 
 
@@ -42,49 +43,55 @@ def osslsigncode_verify(filename, substr=b""):
     return proc.returncode == 0
 
 
-@pytest.mark.parametrize("test_file", TEST_FILES)
-@pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
-# Using sha1cert here is fine. It doesn't really matter what digest is used in
-# the certificate itself
-def test_signature_parity(test_file, digest_algo, tmp_path, sha1cert):
-    """
-    Tests that we can generate the same signatures as osslsigncode
-    """
-    signed_exe = tmp_path / "signed.exe"
+def osslsigncode_sign(signing_keys, digest_algo, input_file, output_file, *extra_args):
     subprocess.run(
         [
             "osslsigncode",
             "sign",
             "-key",
-            sha1cert[0],
+            signing_keys[0],
             "-certs",
-            sha1cert[1],
+            signing_keys[1],
             "-h",
             digest_algo,
-            test_file,
-            signed_exe,
+            *extra_args,
+            input_file,
+            output_file,
         ],
         check=True,
     )
 
+
+def get_signing_time(certificates):
+    signatures = get_signatures_from_certificates(certificates)
+    signed_data = signatures[0]
+
+    signing_time = None
+    for a in signed_data["signerInfos"][0]["authenticatedAttributes"]:
+        if a["type"] == id_signingTime:
+            signing_time = a["values"][0]
+            break
+
+    return signing_time
+
+
+@pytest.mark.parametrize("test_file", TEST_FILES)
+@pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
+def test_signature_parity(test_file, digest_algo, tmp_path, signing_keys):
+    """
+    Tests that we can generate the same signatures as osslsigncode
+    """
+    signed_exe = tmp_path / "signed.exe"
+    osslsigncode_sign(signing_keys, digest_algo, test_file, signed_exe)
+
     with signed_exe.open("rb") as f:
         certificates = get_certificates(f)
-        signatures = get_signatures_from_certificates(certificates)
-        assert len(signatures) == 1
-        signed_data = signatures[0]
-
-        signing_time = None
-        for a in signed_data["signerInfos"][0]["authenticatedAttributes"]:
-            if a["type"] == id_signingTime:
-                signing_time = a["values"][0]
-                break
-
-        assert signing_time
+        signing_time = get_signing_time(certificates)
 
         authenticode_digest = calc_hash(f, digest_algo)
         sig = get_authenticode_signature(
-            load_pem_cert(sha1cert[1].read_bytes()),
-            decode_key(sha1cert[0].read_bytes()),
+            load_pem_cert(signing_keys[1].read_bytes()),
+            decode_key(signing_keys[0].read_bytes()),
             authenticode_digest,
             digest_algo,
             signing_time,
@@ -92,19 +99,19 @@ def test_signature_parity(test_file, digest_algo, tmp_path, sha1cert):
         sig = der_encode(sig)
         padlen = (8 - len(sig) % 8) % 8
         sig += b"\x00" * padlen
-        assert len(sig) == len(certificates[0]["data"])
+        assert sig == certificates[0]["data"]
 
 
 @pytest.mark.parametrize("test_file", TEST_FILES)
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
-def test_attach_signature(test_file, digest_algo, tmp_path, sha1cert):
+def test_attach_signature(test_file, digest_algo, tmp_path, signing_keys):
     "Check that we can validly attach signatures we generate"
     signed_exe = tmp_path / "signed.exe"
     with test_file.open("rb") as ifile, signed_exe.open("wb+") as ofile:
         authenticode_digest = calc_hash(ifile, digest_algo)
         sig = get_authenticode_signature(
-            load_pem_cert(sha1cert[1].read_bytes()),
-            decode_key(sha1cert[0].read_bytes()),
+            load_pem_cert(signing_keys[1].read_bytes()),
+            decode_key(signing_keys[0].read_bytes()),
             authenticode_digest,
             digest_algo,
         )
@@ -114,6 +121,7 @@ def test_attach_signature(test_file, digest_algo, tmp_path, sha1cert):
 
     # Verify that it's sane
     assert osslsigncode_verify(signed_exe)
+    assert verify_pefile(signed_exe.open("rb"))
 
 
 # TODO: This test should fail. We're hardcoding the timestamp response for the wrong
@@ -122,15 +130,15 @@ def test_attach_signature(test_file, digest_algo, tmp_path, sha1cert):
 # @pytest.mark.parametrize("test_file", TEST_FILES)
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
 def test_attach_signature_rfc3161_timestamp(
-    test_file, digest_algo, tmp_path, sha1cert, httpserver
+    test_file, digest_algo, tmp_path, signing_keys, httpserver
 ):
     "Check that we can validly attach signatures we generate"
     signed_exe = tmp_path / "signed.exe"
     with test_file.open("rb") as ifile, signed_exe.open("wb+") as ofile:
         authenticode_digest = calc_hash(ifile, digest_algo)
         sig = get_authenticode_signature(
-            load_pem_cert(sha1cert[1].read_bytes()),
-            decode_key(sha1cert[0].read_bytes()),
+            load_pem_cert(signing_keys[1].read_bytes()),
+            decode_key(signing_keys[0].read_bytes()),
             authenticode_digest,
             digest_algo,
         )
@@ -144,6 +152,7 @@ def test_attach_signature_rfc3161_timestamp(
 
     # Verify that it's sane
     assert osslsigncode_verify(signed_exe)
+    assert verify_pefile(signed_exe.open("rb"))
     # TODO: Verify that the timestamp is valid. osslsigncode currently doesn't
     # check this
 
@@ -154,15 +163,15 @@ def test_attach_signature_rfc3161_timestamp(
 # @pytest.mark.parametrize("test_file", TEST_FILES)
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
 def test_attach_signature_old_timestamp(
-    test_file, digest_algo, tmp_path, sha1cert, httpserver
+    test_file, digest_algo, tmp_path, signing_keys, httpserver
 ):
     "Check that we can validly attach signatures we generate"
     signed_exe = tmp_path / "signed.exe"
     with test_file.open("rb") as ifile, signed_exe.open("wb+") as ofile:
         authenticode_digest = calc_hash(ifile, digest_algo)
         sig = get_authenticode_signature(
-            load_pem_cert(sha1cert[1].read_bytes()),
-            decode_key(sha1cert[0].read_bytes()),
+            load_pem_cert(signing_keys[1].read_bytes()),
+            decode_key(signing_keys[0].read_bytes()),
             authenticode_digest,
             digest_algo,
         )
@@ -176,37 +185,96 @@ def test_attach_signature_old_timestamp(
 
     # Verify that it's sane
     assert osslsigncode_verify(signed_exe)
+    assert verify_pefile(signed_exe.open("rb"))
     # TODO: Verify that the timestamp is valid. osslsigncode currently doesn't
     # check this
 
 
 @pytest.mark.parametrize("test_file", TEST_FILES)
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
-# Using sha1cert here is fine. It doesn't really matter what digest is used in
-# the certificate itself
-def test_calc_hash(test_file, digest_algo, tmp_path, sha1cert):
+def test_calc_hash(test_file, digest_algo, tmp_path, signing_keys):
     """
     Tests that we can calculate the same PE file hash as osslsigncode
     """
     signed_exe = tmp_path / "signed.exe"
-    subprocess.run(
-        [
-            "osslsigncode",
-            "sign",
-            "-key",
-            sha1cert[0],
-            "-certs",
-            sha1cert[1],
-            "-h",
-            digest_algo,
-            test_file,
-            signed_exe,
-        ],
-        check=True,
-    )
+    osslsigncode_sign(signing_keys, digest_algo, test_file, signed_exe)
     assert osslsigncode_verify(signed_exe)
+    assert verify_pefile(signed_exe.open("rb"))
 
     with open(test_file, "rb") as unsigned, open(signed_exe, "rb") as signed:
         unsigned_hash = hexlify(calc_hash(unsigned))
         signed_hash = hexlify(calc_hash(signed))
         assert unsigned_hash == signed_hash
+
+
+@pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
+def test_signature_parity_rfc3161_timestamp(
+    digest_algo, tmp_path, signing_keys, httpserver
+):
+    """
+    Tests that we can generate the same signatures as osslsigncode, using
+    RFC3161 timestamps
+    """
+    httpserver.serve_content(
+        (DATA_DIR / f"unsigned-{digest_algo}-ts-rfc3161.dat").read_bytes()
+    )
+    test_file = DATA_DIR / "unsigned.exe"
+    signed_exe = tmp_path / "signed.exe"
+    osslsigncode_sign(
+        signing_keys, digest_algo, test_file, signed_exe, "-ts", httpserver.url
+    )
+
+    with signed_exe.open("rb") as f:
+        certificates = get_certificates(f)
+        signing_time = get_signing_time(certificates)
+
+        authenticode_digest = calc_hash(f, digest_algo)
+        sig = get_authenticode_signature(
+            load_pem_cert(signing_keys[1].read_bytes()),
+            decode_key(signing_keys[0].read_bytes()),
+            authenticode_digest,
+            digest_algo,
+            signing_time,
+        )
+        add_rfc3161_timestamp(sig["content"], digest_algo, httpserver.url)
+        sig = der_encode(sig)
+        padlen = (8 - len(sig) % 8) % 8
+        sig += b"\x00" * padlen
+        assert sig == certificates[0]["data"], "signatures differ"
+
+
+@pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
+def test_signature_parity_old_timestamp(
+    digest_algo, tmp_path, signing_keys, httpserver
+):
+    """
+    Tests that we can generate the same signatures as osslsigncode, using old timestamps
+    """
+    httpserver.serve_content(
+        (DATA_DIR / f"unsigned-{digest_algo}-ts-old.dat").read_bytes()
+    )
+    test_file = DATA_DIR / "unsigned.exe"
+    signed_exe = tmp_path / "signed.exe"
+    osslsigncode_sign(
+        signing_keys, digest_algo, test_file, signed_exe, "-t", httpserver.url
+    )
+
+    with signed_exe.open("rb") as f:
+        certificates = get_certificates(f)
+        signing_time = get_signing_time(certificates)
+
+        authenticode_digest = calc_hash(f, digest_algo)
+        sig = get_authenticode_signature(
+            load_pem_cert(signing_keys[1].read_bytes()),
+            decode_key(signing_keys[0].read_bytes()),
+            authenticode_digest,
+            digest_algo,
+            signing_time,
+        )
+        add_old_timestamp(sig["content"], httpserver.url)
+        sig = der_encode(sig)
+        padlen = (8 - len(sig) % 8) % 8
+        sig += b"\x00" * padlen
+        (tmp_path / "orig.sig").write_bytes(certificates[0]["data"])
+        (tmp_path / "new.sig").write_bytes(sig)
+        assert sig == certificates[0]["data"], "signatures differ"

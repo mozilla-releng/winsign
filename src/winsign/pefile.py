@@ -11,6 +11,7 @@ from construct import (
     Array,
     Bytes,
     Const,
+    Container,
     Enum,
     GreedyRange,
     If,
@@ -210,7 +211,7 @@ def add_signature(ifile, ofile, signature):
 
 
 def get_certificates(ifile):
-    if isinstance(ifile, Struct):
+    if isinstance(ifile, Container):
         pe = ifile
     else:
         ifile.seek(0)

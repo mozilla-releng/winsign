@@ -8,8 +8,14 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, utils
 from pyasn1.codec.der.decoder import decode as der_decode
 from pyasn1.codec.der.encoder import encode as der_encode
-from pyasn1.type import univ, useful
-from pyasn1_modules.rfc2315 import Attribute, ContentInfo, SignedData, SignerInfo
+from pyasn1.type import tag, univ, useful
+from pyasn1_modules.rfc2315 import (
+    Attribute,
+    ContentInfo,
+    ExtendedCertificateOrCertificate,
+    SignedData,
+    SignerInfo,
+)
 from winsign.asn1 import (
     ASN_DIGEST_ALGO_MAP,
     SpcIndirectDataContent,
@@ -177,10 +183,11 @@ def add_rfc3161_timestamp(sig, digest_algo, timestamp_url=None):
     """
     signature = der_encode(sig["signerInfos"][0]["encryptedDigest"])
     ts = get_rfc3161_timestamp(digest_algo, signature, timestamp_url)
-    sig["signerInfos"][0]["unauthenticatedAttributes"][0][
+    i = len(sig["signerInfos"][0]["unauthenticatedAttributes"])
+    sig["signerInfos"][0]["unauthenticatedAttributes"][i][
         "type"
     ] = univ.ObjectIdentifier("1.3.6.1.4.1.311.3.3.1")
-    sig["signerInfos"][0]["unauthenticatedAttributes"][0]["values"][0] = ts
+    sig["signerInfos"][0]["unauthenticatedAttributes"][i]["values"][0] = ts
     return sig
 
 
@@ -198,10 +205,28 @@ def add_old_timestamp(sig, timestamp_url=None):
     """
     signature = der_encode(sig["signerInfos"][0]["encryptedDigest"])
     ts = get_old_timestamp(signature, timestamp_url)
-    sig["signerInfos"][0]["unauthenticatedAttributes"][0][
+    # Use SequenceOf here to force the order to what we want
+    # Assuming this should be in the order of the validity
+    # TODO: Not sure if this is correct, but seems to work
+    certificates = univ.SequenceOf(ExtendedCertificateOrCertificate()).subtype(
+        implicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatConstructed, 0)
+    )
+    certificates.extend(sig["certificates"])
+    for cert in sorted(
+        ts["certificates"],
+        key=lambda c: c["certificate"]["tbsCertificate"]["validity"]["notBefore"],
+    ):
+        certificates.append(cert)
+    sig["certificates"] = certificates
+
+    i = len(sig["signerInfos"][0]["unauthenticatedAttributes"])
+    sig["signerInfos"][0]["unauthenticatedAttributes"][i][
         "type"
-    ] = univ.ObjectIdentifier("1.3.6.1.4.1.311.3.3.1")
-    sig["signerInfos"][0]["unauthenticatedAttributes"][0]["values"][0] = ts
+    ] = univ.ObjectIdentifier("1.2.840.113549.1.9.6")
+    sig["signerInfos"][0]["unauthenticatedAttributes"][i]["values"][0] = ts[
+        "signerInfos"
+    ][0]
+
     return sig
 
 

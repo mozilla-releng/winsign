@@ -84,13 +84,10 @@ def get_old_timestamp(signature, timestamp_url=None):
     b64_req = base64.b64encode(encoded_req)
 
     url = timestamp_url or "http://timestamp.digicert.com"
-    # url = "http://timestamp.digicert.com"
 
     resp = requests.post(
         url, data=b64_req, headers={"Content-Type": "application/octet-stream"}
     )
-    # sig = hexlify(signature)
-    # open(f"ts-old-{sig[:10]}.dat", "wb").write(resp.content)
     ci, _ = der_decode(base64.b64decode(resp.content), ContentInfo())
     ts, _ = der_decode(ci["content"], SignedData())
     return ts

@@ -12,7 +12,7 @@ from winsign.x509 import decode_key, load_pem_cert
 
 @pytest.mark.parametrize("test_file", EXPECTED_SIGNATURES.keys())
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
-def test_signatures(test_file, digest_algo, sha1cert):
+def test_signatures(test_file, digest_algo, signing_keys):
     """Make sure that we can generate the expected signatures for the same test data"""
     expected_sig = EXPECTED_SIGNATURES[test_file][digest_algo]
 
@@ -21,8 +21,8 @@ def test_signatures(test_file, digest_algo, sha1cert):
     with test_file.open("rb") as f:
         authenticode_digest = calc_hash(f, digest_algo)
         sig = get_authenticode_signature(
-            load_pem_cert(sha1cert[1].read_bytes()),
-            decode_key(sha1cert[0].read_bytes()),
+            load_pem_cert(signing_keys[1].read_bytes()),
+            decode_key(signing_keys[0].read_bytes()),
             authenticode_digest,
             digest_algo,
             signing_time,
