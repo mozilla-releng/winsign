@@ -3,7 +3,7 @@ from datetime import datetime
 import pytest
 from common import DATA_DIR, EXPECTED_SIGNATURES
 from pyasn1.type import univ, useful
-from winsign.pefile import calc_hash
+from winsign.pefile import calc_authenticode_digest
 from winsign.sign import (
     add_old_timestamp,
     add_rfc3161_timestamp,
@@ -18,7 +18,7 @@ def test_rfc3161_timestamp(test_file, digest_algo, signing_keys, httpserver):
     signing_time = useful.UTCTime.fromDateTime(datetime(2019, 4, 29))
 
     with test_file.open("rb") as f:
-        authenticode_digest = calc_hash(f, digest_algo)
+        authenticode_digest = calc_authenticode_digest(f, digest_algo)
         sig = get_authenticode_signature(
             load_pem_cert(signing_keys[1].read_bytes()),
             decode_key(signing_keys[0].read_bytes()),
@@ -47,7 +47,7 @@ def test_old_timestamp(test_file, digest_algo, signing_keys, httpserver):
     signing_time = useful.UTCTime.fromDateTime(datetime(2019, 4, 29))
 
     with test_file.open("rb") as f:
-        authenticode_digest = calc_hash(f, digest_algo)
+        authenticode_digest = calc_authenticode_digest(f, digest_algo)
         sig = get_authenticode_signature(
             load_pem_cert(signing_keys[1].read_bytes()),
             decode_key(signing_keys[0].read_bytes()),

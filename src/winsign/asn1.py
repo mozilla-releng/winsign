@@ -18,14 +18,16 @@ algo_sha256 = (
 ASN_DIGEST_ALGO_MAP = {"sha1": algo_sha1, "sha256": algo_sha256}
 
 id_contentType = univ.ObjectIdentifier("1.2.840.113549.1.9.3")
-id_spcIndirectDataContext = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.4")
+id_messageDigest = univ.ObjectIdentifier("1.2.840.113549.1.9.4")
 id_signingTime = univ.ObjectIdentifier("1.2.840.113549.1.9.5")
+id_counterSignature = univ.ObjectIdentifier("1.2.840.113549.1.9.6")
+id_spcIndirectDataContext = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.4")
 id_spcStatementType = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.11")
 id_individualCodeSigning = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.21")
-id_messageDigest = univ.ObjectIdentifier("1.2.840.113549.1.9.4")
 id_signedData = univ.ObjectIdentifier("1.2.840.113549.1.7.2")
 id_spcSpOpusInfo = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.12")
 id_rsaEncryption = univ.ObjectIdentifier("1.2.840.113549.1.1.1")
+id_timestampSignature = univ.ObjectIdentifier("1.3.6.1.4.1.311.3.3.1")
 
 
 class SpcString(univ.Choice):

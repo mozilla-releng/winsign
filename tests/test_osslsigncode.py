@@ -5,7 +5,7 @@ import pytest
 from common import DATA_DIR, EXPECTED_SIGNATURES, TEST_FILES
 from pyasn1.codec.der.encoder import encode as der_encode
 from winsign.asn1 import id_signingTime
-from winsign.pefile import add_signature, calc_hash, get_certificates
+from winsign.pefile import add_signature, calc_authenticode_digest, get_certificates
 from winsign.sign import (
     add_old_timestamp,
     add_rfc3161_timestamp,
@@ -88,7 +88,7 @@ def test_signature_parity(test_file, digest_algo, tmp_path, signing_keys):
         certificates = get_certificates(f)
         signing_time = get_signing_time(certificates)
 
-        authenticode_digest = calc_hash(f, digest_algo)
+        authenticode_digest = calc_authenticode_digest(f, digest_algo)
         sig = get_authenticode_signature(
             load_pem_cert(signing_keys[1].read_bytes()),
             decode_key(signing_keys[0].read_bytes()),
@@ -108,7 +108,7 @@ def test_attach_signature(test_file, digest_algo, tmp_path, signing_keys):
     "Check that we can validly attach signatures we generate"
     signed_exe = tmp_path / "signed.exe"
     with test_file.open("rb") as ifile, signed_exe.open("wb+") as ofile:
-        authenticode_digest = calc_hash(ifile, digest_algo)
+        authenticode_digest = calc_authenticode_digest(ifile, digest_algo)
         sig = get_authenticode_signature(
             load_pem_cert(signing_keys[1].read_bytes()),
             decode_key(signing_keys[0].read_bytes()),
@@ -118,6 +118,11 @@ def test_attach_signature(test_file, digest_algo, tmp_path, signing_keys):
         encoded_sig = der_encode(sig)
         ifile.seek(0)
         add_signature(ifile, ofile, encoded_sig)
+
+    # Check that we get the same signature on the output file
+    assert authenticode_digest == calc_authenticode_digest(
+        signed_exe.open("rb"), digest_algo
+    )
 
     # Verify that it's sane
     assert osslsigncode_verify(signed_exe)
@@ -135,7 +140,7 @@ def test_attach_signature_rfc3161_timestamp(
     "Check that we can validly attach signatures we generate"
     signed_exe = tmp_path / "signed.exe"
     with test_file.open("rb") as ifile, signed_exe.open("wb+") as ofile:
-        authenticode_digest = calc_hash(ifile, digest_algo)
+        authenticode_digest = calc_authenticode_digest(ifile, digest_algo)
         sig = get_authenticode_signature(
             load_pem_cert(signing_keys[1].read_bytes()),
             decode_key(signing_keys[0].read_bytes()),
@@ -168,7 +173,7 @@ def test_attach_signature_old_timestamp(
     "Check that we can validly attach signatures we generate"
     signed_exe = tmp_path / "signed.exe"
     with test_file.open("rb") as ifile, signed_exe.open("wb+") as ofile:
-        authenticode_digest = calc_hash(ifile, digest_algo)
+        authenticode_digest = calc_authenticode_digest(ifile, digest_algo)
         sig = get_authenticode_signature(
             load_pem_cert(signing_keys[1].read_bytes()),
             decode_key(signing_keys[0].read_bytes()),
@@ -192,7 +197,7 @@ def test_attach_signature_old_timestamp(
 
 @pytest.mark.parametrize("test_file", TEST_FILES)
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
-def test_calc_hash(test_file, digest_algo, tmp_path, signing_keys):
+def test_calc_digest(test_file, digest_algo, tmp_path, signing_keys):
     """
     Tests that we can calculate the same PE file hash as osslsigncode
     """
@@ -202,9 +207,9 @@ def test_calc_hash(test_file, digest_algo, tmp_path, signing_keys):
     assert verify_pefile(signed_exe.open("rb"))
 
     with open(test_file, "rb") as unsigned, open(signed_exe, "rb") as signed:
-        unsigned_hash = hexlify(calc_hash(unsigned))
-        signed_hash = hexlify(calc_hash(signed))
-        assert unsigned_hash == signed_hash
+        unsigned_digest = hexlify(calc_authenticode_digest(unsigned))
+        signed_digest = hexlify(calc_authenticode_digest(signed))
+        assert unsigned_digest == signed_digest
 
 
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
@@ -228,7 +233,7 @@ def test_signature_parity_rfc3161_timestamp(
         certificates = get_certificates(f)
         signing_time = get_signing_time(certificates)
 
-        authenticode_digest = calc_hash(f, digest_algo)
+        authenticode_digest = calc_authenticode_digest(f, digest_algo)
         sig = get_authenticode_signature(
             load_pem_cert(signing_keys[1].read_bytes()),
             decode_key(signing_keys[0].read_bytes()),
@@ -263,7 +268,7 @@ def test_signature_parity_old_timestamp(
         certificates = get_certificates(f)
         signing_time = get_signing_time(certificates)
 
-        authenticode_digest = calc_hash(f, digest_algo)
+        authenticode_digest = calc_authenticode_digest(f, digest_algo)
         sig = get_authenticode_signature(
             load_pem_cert(signing_keys[1].read_bytes()),
             decode_key(signing_keys[0].read_bytes()),
@@ -275,6 +280,7 @@ def test_signature_parity_old_timestamp(
         sig = der_encode(sig)
         padlen = (8 - len(sig) % 8) % 8
         sig += b"\x00" * padlen
-        (tmp_path / "orig.sig").write_bytes(certificates[0]["data"])
-        (tmp_path / "new.sig").write_bytes(sig)
+        # For easier debugging, write out the signatures separately so we can compare them after
+        # (tmp_path / "orig.sig").write_bytes(certificates[0]["data"])
+        # (tmp_path / "new.sig").write_bytes(sig)
         assert sig == certificates[0]["data"], "signatures differ"

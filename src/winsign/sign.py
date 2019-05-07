@@ -22,6 +22,7 @@ from winsign.asn1 import (
     SpcSpOpusInfo,
     der_header_length,
     id_contentType,
+    id_counterSignature,
     id_individualCodeSigning,
     id_messageDigest,
     id_rsaEncryption,
@@ -30,12 +31,13 @@ from winsign.asn1 import (
     id_spcIndirectDataContext,
     id_spcSpOpusInfo,
     id_spcStatementType,
+    id_timestampSignature,
 )
 from winsign.pkcs7 import x509_to_pkcs7
 from winsign.timestamp import get_old_timestamp, get_rfc3161_timestamp
 
 
-def calc_spc_hash(encoded_content, digest_algo):
+def calc_spc_digest(encoded_content, digest_algo):
     hlen = der_header_length(encoded_content)
     digest = hashlib.new(digest_algo, encoded_content[hlen:]).digest()
     return digest
@@ -52,7 +54,7 @@ def make_spc(digest_algo, authenticode_digest):
 
 
 def make_signer_info(
-    pkcs7_cert, digest_algo, timestamp, spc_hash, opus_info=None, opus_url=None
+    pkcs7_cert, digest_algo, timestamp, spc_digest, opus_info=None, opus_url=None
 ):
     signer_info = SignerInfo()
     signer_info["version"] = 1
@@ -84,11 +86,13 @@ def make_signer_info(
         i = 4
 
     signer_info["authenticatedAttributes"][i]["type"] = id_messageDigest
-    signer_info["authenticatedAttributes"][i]["values"][0] = univ.OctetString(spc_hash)
+    signer_info["authenticatedAttributes"][i]["values"][0] = univ.OctetString(
+        spc_digest
+    )
     return signer_info
 
 
-def calc_signer_hash(signer_info, digest_algo):
+def calc_signer_digest(signer_info, digest_algo):
     auth_attrs = univ.SetOf(componentType=Attribute())
     for i, v in enumerate(signer_info["authenticatedAttributes"]):
         auth_attrs[i] = v
@@ -97,12 +101,12 @@ def calc_signer_hash(signer_info, digest_algo):
     return hashlib.new(digest_algo, auth_attrs_encoded).digest()
 
 
-def sign_signer_hash(priv_key, digest_algo, signer_hash):
+def sign_signer_digest(priv_key, digest_algo, signer_digest):
     crypto_digest = {"sha1": hashes.SHA1(), "sha256": hashes.SHA256()}[  # nosec
         digest_algo
     ]
     signature = priv_key.sign(
-        signer_hash, padding.PKCS1v15(), utils.Prehashed(crypto_digest)
+        signer_digest, padding.PKCS1v15(), utils.Prehashed(crypto_digest)
     )
     return signature
 
@@ -145,12 +149,12 @@ def get_authenticode_signature(
     pkcs7_cert = x509_to_pkcs7(cert)
 
     signer_info = make_signer_info(
-        pkcs7_cert, digest_algo, timestamp, calc_spc_hash(encoded_spc, digest_algo)
+        pkcs7_cert, digest_algo, timestamp, calc_spc_digest(encoded_spc, digest_algo)
     )
 
-    signer_hash = calc_signer_hash(signer_info, digest_algo)
-    signer_info["encryptedDigest"] = sign_signer_hash(
-        priv_key, digest_algo, signer_hash
+    signer_digest = calc_signer_digest(signer_info, digest_algo)
+    signer_info["encryptedDigest"] = sign_signer_digest(
+        priv_key, digest_algo, signer_digest
     )
 
     sig = SignedData()
@@ -186,7 +190,7 @@ def add_rfc3161_timestamp(sig, digest_algo, timestamp_url=None):
     i = len(sig["signerInfos"][0]["unauthenticatedAttributes"])
     sig["signerInfos"][0]["unauthenticatedAttributes"][i][
         "type"
-    ] = univ.ObjectIdentifier("1.3.6.1.4.1.311.3.3.1")
+    ] = id_timestampSignature
     sig["signerInfos"][0]["unauthenticatedAttributes"][i]["values"][0] = ts
     return sig
 
@@ -220,9 +224,7 @@ def add_old_timestamp(sig, timestamp_url=None):
     sig["certificates"] = certificates
 
     i = len(sig["signerInfos"][0]["unauthenticatedAttributes"])
-    sig["signerInfos"][0]["unauthenticatedAttributes"][i][
-        "type"
-    ] = univ.ObjectIdentifier("1.2.840.113549.1.9.6")
+    sig["signerInfos"][0]["unauthenticatedAttributes"][i]["type"] = id_counterSignature
     sig["signerInfos"][0]["unauthenticatedAttributes"][i]["values"][0] = ts[
         "signerInfos"
     ][0]

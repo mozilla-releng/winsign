@@ -121,7 +121,7 @@ except ImportError:
     calc_checksum = calc_checksum_slow
 
 
-def calc_hash(f, alg="sha256"):
+def calc_authenticode_digest(f, alg="sha256"):
     h = hashlib.new(alg)
     f.seek(0)
     pe = pefile.parse_stream(f)
@@ -147,13 +147,13 @@ def calc_hash(f, alg="sha256"):
     # Read the rest of the file, until the certificates
     if pe.optional_header.certtable_offset:
         to_read = pe.optional_header.certtable_offset - f.tell()
+        padlen = 8 - (pe.optional_header.certtable_offset % 8)
     else:
         to_read = eof - f.tell()
+        padlen = 8 - (eof % 8)
     h.update(f.read(to_read))
 
-    # Pad to 8 bytes
-    # TODO: Should this be done elsewhere?
-    padlen = 8 - (eof % 8)
+    # Pad the end of the file, before the certificates to 8 bytes
     if padlen > 0 and padlen < 8:
         h.update(b"\x00" * padlen)
 
