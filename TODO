@@ -1,5 +1,3 @@
-* Signature verification
+* Signature verification for old style timestamps
 * CLI
-* mocked out timestamp tests
-* old style timestamps
 * MSI files
