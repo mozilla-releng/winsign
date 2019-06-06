@@ -6,7 +6,7 @@
 from glob import glob
 from os.path import basename, splitext
 
-from setuptools import Extension, find_packages, setup
+from setuptools import find_packages, setup
 
 with open("README.rst") as readme_file:
     readme = readme_file.read()
@@ -16,7 +16,7 @@ with open("HISTORY.rst") as history_file:
 
 requirements = []
 
-setup_requirements = ["pytest-runner", "cython"]
+setup_requirements = ["pytest-runner"]
 
 test_requirements = ["pytest"]
 
@@ -42,7 +42,6 @@ setup(
     packages=find_packages("src"),
     package_dir={"": "src"},
     py_modules=[splitext(basename(path))[0] for path in glob("src/*.py")],
-    ext_modules=[Extension("winsign._hash", ["src/winsign/_hash.c"])],
     setup_requires=setup_requirements,
     test_suite="tests",
     tests_require=test_requirements,

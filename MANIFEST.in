@@ -4,6 +4,7 @@ include LICENSE
 include README.rst
 include CODE_OF_CONDUCT.md
 include tox.ini
+include TODO
 
 recursive-include requirements *.in
 recursive-include requirements *.txt
@@ -11,23 +12,14 @@ recursive-include tests *
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
 
+
+recursive-include src *.py
+
 recursive-include docs *.rst conf.py
 
-recursive-include build *.so
-recursive-include src *.pyx
-
-# added by check_manifest.py
-include TODO
-recursive-include tests *.1
+recursive-include tests *.msi
 recursive-include tests *.dll
 recursive-include tests *.exe
-recursive-include tests *.zip
+recursive-include tests *.py
 
-# added by check_manifest.py
 include .isort.cfg
-recursive-include src *.py
-recursive-include tests *.dat
-
-# added by check_manifest.py
-recursive-include src *.py
-recursive-include tests *.dat

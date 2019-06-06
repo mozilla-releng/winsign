@@ -3,4 +3,3 @@ pyasn1_modules
 cryptography
 construct
 requests
-cython

@@ -1,245 +1,346 @@
+#!/usr/bin/env python
+import base64
+import logging
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from argparse import ArgumentParser
+from binascii import hexlify
+from contextlib import contextmanager
+from pathlib import Path
+
+from winsign.asn1 import get_signeddata, resign
+from winsign.crypto import load_pem_cert, load_private_key, sign_signer_digest
+from winsign.pefile import certificate, is_pefile
+
+log = logging.getLogger(__name__)
+
+# These dummy key/cert are used to generate the initial signature for the file
+DUMMY_KEY = """\
+-----BEGIN CERTIFICATE-----
+MIIDCzCCAfOgAwIBAgIUc78I6NKAGZlH8eD4Y1DumwxxzaIwDQYJKoZIhvcNAQEL
+BQAwFTETMBEGA1UEAwwKRHVtbXkgQ2VydDAeFw0xOTA1MjMxNTE5NDNaFw0xOTA2
+MjIxNTE5NDNaMBUxEzARBgNVBAMMCkR1bW15IENlcnQwggEiMA0GCSqGSIb3DQEB
+AQUAA4IBDwAwggEKAoIBAQDmC1Doj8oLID1YcQqPfB6nD3tr+43QcFKH21QBV3yV
+fVKv5ztDh52EpP6SLpYlvyzlR1nmdJLxdbxVswyDb+t+qO3GTlKqkoqegjEhU6k0
+aOYWx+1wfqJUAMLpHtn51vf461pwTHwSybQ/NEAKkG9ySDAcCVFfz22MRGP8utMO
+GRONWEV2M854+FRrLUgolp48TUXf5B1PhBLhJ5AvnFph4vqfQ6NefJ6RznhBo/EV
+yBPxYC686DA17bV/QEeTIiJnSXndQSN8WmkufyHZBbnd4e9pTVf40BXZXZOQ93s1
+LO2vc16Vn+Ezvuia5LNrtbD242VKOTLY90mgdLGJDO9nAgMBAAGjUzBRMB0GA1Ud
+DgQWBBQlhnJSTTtjwyEw0fOszPTIyuNFDTAfBgNVHSMEGDAWgBQlhnJSTTtjwyEw
+0fOszPTIyuNFDTAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQAU
+DxAoaNnRvBV0HaI7i4s5Cqpu8vgeM4tZ7cRvhqFnyVa2GLpoZBXYgQwjcAYEHysD
+urMydnVzye6sHprXCaxLBAGLR5dy8CcrLGlg4vxvReVE8xoyjnoS7gfFdTNLaWq2
+Wc6zCcsC5Z6RvSOjO3SyOCRTu3ghB6Qgr16tOIqAAGg1+fPzfl1uaErJDQL3LHbR
+IYyhSISW9MZzkbXT6mpM0n2XVgd7tfPj6S3leLJ8/acSC/Xa8vcQNEXtCRmqClPh
+KLoTWf6E+RRiUuj5D8XvKbBB/qiIe7UpgtjDsmsmyxBtd8tMpSBZ5Yz7mm4ozGVq
+qy0UlC6klwFznbr8uZgd
+-----END CERTIFICATE-----
+-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDmC1Doj8oLID1Y
+cQqPfB6nD3tr+43QcFKH21QBV3yVfVKv5ztDh52EpP6SLpYlvyzlR1nmdJLxdbxV
+swyDb+t+qO3GTlKqkoqegjEhU6k0aOYWx+1wfqJUAMLpHtn51vf461pwTHwSybQ/
+NEAKkG9ySDAcCVFfz22MRGP8utMOGRONWEV2M854+FRrLUgolp48TUXf5B1PhBLh
+J5AvnFph4vqfQ6NefJ6RznhBo/EVyBPxYC686DA17bV/QEeTIiJnSXndQSN8Wmku
+fyHZBbnd4e9pTVf40BXZXZOQ93s1LO2vc16Vn+Ezvuia5LNrtbD242VKOTLY90mg
+dLGJDO9nAgMBAAECggEAbEmzYmYdU7NvbSx5LiXdQALXtHMLxKy7DNy/5InMSYpe
+3BLbIOS7z27jruhjIY2mkp9NwF/rs+IaL7VDFLQghNT8aLcBzu2AdzEN84QwSE2A
+0gR2ztetjiF1nss5DJSW0gPn5Kj8VtPAF2h/JPnsnD1C+E+ikJlSFg8zigpfw2hC
+BCzAIuawESMOsX49O7hQO1Xbqoettl1s2v4oLg5zSEx6RvGqAv94vQM4Pc8vIouI
+HDRG/OrjwSyAKymWfCepNRvDf9ooXLaMBb4J+DilBj3pyzzZ84QBI0uIaS6SFtOD
+zvaSh+1z0lsqseItmFjCcYnVLvzU4+dEBYGvaDrA0QKBgQD0PPXHrXCKo+mPOgQS
+I4RsqzoYkNyJG2tlElpVY+QJCNvalpnDiI3X1x0LhVrT8U/PaHcRnxMzceGqXVkY
+CJ27AKh1iS43zUnqhl4PK2TQ1sBMtrkHE9FBgVF74b15UvXSAVxxYT2qP6t9aCSk
+G4+tYszIrmcH9qGJcuNN9UKXxQKBgQDxH159MIzN1UOdX2QSkfZDIO6bUsCtTATe
+iA8slmPybTHKL27ut5lGDZe02uTpz9sLVD80xevzhWS1BC5N6ilHNso8xqzVjbbz
+bUcZCFKuUaQ/yjUTZtRnT6kUpDLLQNF3XxIeKPLnioOrFfb7U508d/SABda/x/7A
+uCJNLD5xOwKBgGX1mOkt14CZIuSe5Jop55tx88PTna1DHBdKjRl+pPC8mQNswW4m
+cIh9jeuEVUGLSLUeOC7MCLj+PqXfaFUnK6mogarnhLrY4ZWdWGDezax9KjQcR6vT
+sxS0hq6/s1iVsHdmCBBw9sw+3jlxI3K66sUILNNOM0bYx+DYbFncHFu9AoGBAMfY
+hgogqTMYZTgUDe9ORtuQefMGfWeksAx4nIsKAsC1PCUldz4nscPcFDbzjfM0MYqM
+Qu7MdCmcD8HwOyicwaWihbAlwq4lDNNpaRoYSd7tD8NHJwJzoewWnD7dcLQBfxr/
+ExcoPVsm9MZiKBhaTuIFUgKh1EGT01OLyfJIj2BtAoGAQ4JZZjJ/ZOEidqElUedQ
+ChqoRX3PwdCMJ4ZkyxD/QAyS09fgw02DAL1qTVKcZjQnI7XREicC9okFcV7lAVuE
+yMGb5aH9Nsuq8ucPf2JTyZ0CXwcxnaw5zZKaUXzf4Dr3BvDrYZ23ptiDi8pOH0kV
+Iq4ITEtYW5tfl1hf8AyEmz0=
+-----END PRIVATE KEY-----
 """
-Create signatures for Authenticode files
-"""
-import hashlib
-from datetime import datetime
-
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding, utils
-from pyasn1.codec.der.decoder import decode as der_decode
-from pyasn1.codec.der.encoder import encode as der_encode
-from pyasn1.type import tag, univ, useful
-from pyasn1_modules.rfc2315 import (
-    Attribute,
-    ContentInfo,
-    ExtendedCertificateOrCertificate,
-    SignedData,
-    SignerInfo,
-)
-from winsign.asn1 import (
-    ASN_DIGEST_ALGO_MAP,
-    SpcIndirectDataContent,
-    SpcSpOpusInfo,
-    der_header_length,
-    id_contentType,
-    id_counterSignature,
-    id_individualCodeSigning,
-    id_messageDigest,
-    id_rsaEncryption,
-    id_signedData,
-    id_signingTime,
-    id_spcIndirectDataContext,
-    id_spcSpOpusInfo,
-    id_spcStatementType,
-    id_timestampSignature,
-)
-from winsign.pkcs7 import x509_to_pkcs7
-from winsign.timestamp import get_old_timestamp, get_rfc3161_timestamp
 
 
-def calc_spc_digest(encoded_content, digest_algo):
-    hlen = der_header_length(encoded_content)
-    digest = hashlib.new(digest_algo, encoded_content[hlen:]).digest()
-    return digest
+def pem_to_der(pem):
+    lines = [line for line in pem.split(b"\n") if not line.startswith(b"----")]
+    b64 = b"".join(lines)
+    return base64.b64decode(b64)
 
 
-def make_spc(digest_algo, authenticode_digest):
-    spc = SpcIndirectDataContent()
-    spc["data"]["type"] = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.15")
-    spc["data"]["value"]["flags"] = ""
-    spc["data"]["value"]["file"]["file"]["unicode"] = "<<<Obsolete>>>"
-    spc["messageDigest"]["digestAlgorithm"] = ASN_DIGEST_ALGO_MAP[digest_algo]
-    spc["messageDigest"]["digest"] = authenticode_digest
-    return spc
+@contextmanager
+def tmpdir():
+    try:
+        d = tempfile.mkdtemp()
+        yield Path(d)
+    finally:
+        shutil.rmtree(d)
 
 
-def make_signer_info(
-    pkcs7_cert, digest_algo, timestamp, spc_digest, opus_info=None, opus_url=None
+def osslsigncode(args):
+    cmd = ["osslsigncode"] + list(args)
+    log.debug("running: %s", cmd)
+    p = subprocess.run(
+        cmd, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, encoding="utf8"
+    )
+    if p.returncode != 0:
+        log.error("osslsigncode failed when running %s:", args[0])
+        for line in p.stdout.split("\n"):
+            log.error(line)
+        raise OSError("osslsigncode failed")
+
+
+def sign_file(
+    infile, outfile, cert, key, digest_algo, url=None, comment=None, crosscert=None
 ):
-    signer_info = SignerInfo()
-    signer_info["version"] = 1
-    signer_info["issuerAndSerialNumber"]["issuer"] = pkcs7_cert["tbsCertificate"][
-        "issuer"
+    cmd = [
+        "sign",
+        "-certs",
+        cert,
+        "-key",
+        key,
+        "-h",
+        digest_algo,
+        "-in",
+        infile,
+        "-out",
+        outfile,
     ]
-    signer_info["issuerAndSerialNumber"]["serialNumber"] = pkcs7_cert["tbsCertificate"][
-        "serialNumber"
-    ]
-    signer_info["digestAlgorithm"] = ASN_DIGEST_ALGO_MAP[digest_algo]
-    signer_info["digestEncryptionAlgorithm"]["algorithm"] = id_rsaEncryption
-    signer_info["digestEncryptionAlgorithm"]["parameters"] = univ.Null("")
-    signer_info["authenticatedAttributes"][0]["type"] = id_contentType
-    signer_info["authenticatedAttributes"][0]["values"][0] = id_spcIndirectDataContext
-    signer_info["authenticatedAttributes"][1]["type"] = id_signingTime
-    signer_info["authenticatedAttributes"][1]["values"][0] = timestamp
-    signer_info["authenticatedAttributes"][2]["type"] = id_spcStatementType
-    signer_info["authenticatedAttributes"][2]["values"][0] = univ.Sequence()
-    signer_info["authenticatedAttributes"][2]["values"][0][0] = id_individualCodeSigning
-    i = 3
-    if opus_info or opus_url:
-        opus = SpcSpOpusInfo()
-        if opus_info:
-            opus["programName"]["ascii"] = opus_info
-        if opus_url:
-            opus["moreInfo"]["url"] = opus_url
-        signer_info["authenticatedAttributes"][3]["type"] = id_spcSpOpusInfo
-        signer_info["authenticatedAttributes"][3]["values"][0] = opus
-        i = 4
+    if url:
+        cmd += ["-i", url]
+    if comment:
+        cmd += ["-n", comment]
+    if crosscert:
+        cmd += ["-ac", crosscert]
 
-    signer_info["authenticatedAttributes"][i]["type"] = id_messageDigest
-    signer_info["authenticatedAttributes"][i]["values"][0] = univ.OctetString(
-        spc_digest
-    )
-    return signer_info
+    osslsigncode(cmd)
 
 
-def calc_signer_digest(signer_info, digest_algo):
-    auth_attrs = univ.SetOf(componentType=Attribute())
-    for i, v in enumerate(signer_info["authenticatedAttributes"]):
-        auth_attrs[i] = v
-    auth_attrs_encoded = der_encode(auth_attrs)
-
-    return hashlib.new(digest_algo, auth_attrs_encoded).digest()
+def extract_signature(infile, sigfile):
+    cmd = ["extract-signature", "-in", infile, "-out", sigfile, "-pem"]
+    osslsigncode(cmd)
 
 
-def sign_signer_digest(priv_key, digest_algo, signer_digest):
-    crypto_digest = {"sha1": hashes.SHA1(), "sha256": hashes.SHA256()}[  # nosec
-        digest_algo
-    ]
-    signature = priv_key.sign(
-        signer_digest, padding.PKCS1v15(), utils.Prehashed(crypto_digest)
-    )
-    return signature
-
-
-def get_authenticode_signature(
-    cert,
-    priv_key,
-    authenticode_digest,
-    digest_algo,
-    timestamp=None,
-    opus_info=None,
-    opus_url=None,
-):
-    """
-    Creates a SignedData object containing the signature for content using the
-    given certificate and private key.
-
-    Arguments:
-        cert (X509):        public certificate used for signing
-        priv_key (RSA):     private key corresponding to the certificate
-        authenticode_digest (bytes): Authenticode digest of PE file to sign
-                                     NB. This is not simply the hash of the file!
-        timestamp (UTCTime): optional. timestamp to include in the signature.
-                             If not provided, the current time is used.
-        opus_info (string):  Additional information to include in the signature
-        opus_url (string):   URL to include in the signature
-
-    Returns:
-        A ContentInfo ASN1 object
-    """
-    if not timestamp:
-        timestamp = useful.UTCTime.fromDateTime(datetime.now())
-
-    asn_digest_algo = ASN_DIGEST_ALGO_MAP[digest_algo]
-
-    spc = make_spc(digest_algo, authenticode_digest)
-
-    encoded_spc = der_encode(spc)
-
-    pkcs7_cert = x509_to_pkcs7(cert)
-
-    signer_info = make_signer_info(
-        pkcs7_cert, digest_algo, timestamp, calc_spc_digest(encoded_spc, digest_algo)
-    )
-
-    signer_digest = calc_signer_digest(signer_info, digest_algo)
-    signer_info["encryptedDigest"] = sign_signer_digest(
-        priv_key, digest_algo, signer_digest
-    )
-
-    sig = SignedData()
-    sig["version"] = 1
-    sig["digestAlgorithms"][0] = asn_digest_algo
-    sig["certificates"][0]["certificate"] = pkcs7_cert
-    sig["contentInfo"]["contentType"] = id_spcIndirectDataContext
-    sig["contentInfo"]["content"] = encoded_spc
-    sig["signerInfos"][0] = signer_info
-
-    ci = ContentInfo()
-    ci["contentType"] = id_signedData
-    ci["content"] = sig
-
-    return ci
-
-
-def add_rfc3161_timestamp(sig, digest_algo, timestamp_url=None):
-    """
-    Adds an RFC3161 timestamp to a SignedData signature
-
-    Arguments:
-        sig (SignedData): signature to add timestamp
-        digest_algo (str): digest algorithm to use ('sha1' or 'sha256')
-        timestamp_url (str): URL to fetch timestamp from. A default is used if
-                             None is set.
-
-    Returns:
-        sig with the timestamp added
-    """
-    signature = der_encode(sig["signerInfos"][0]["encryptedDigest"])
-    ts = get_rfc3161_timestamp(digest_algo, signature, timestamp_url)
-    i = len(sig["signerInfos"][0]["unauthenticatedAttributes"])
-    sig["signerInfos"][0]["unauthenticatedAttributes"][i][
-        "type"
-    ] = id_timestampSignature
-    sig["signerInfos"][0]["unauthenticatedAttributes"][i]["values"][0] = ts
-    return sig
-
-
-def add_old_timestamp(sig, timestamp_url=None):
-    """
-    Adds an old style timestamp to a SignedData signature
-
-    Arguments:
-        sig (SignedData): signature to add timestamp
-        timestamp_url (str): URL to fetch timestamp from. A default is used if
-                             None is set.
-
-    Returns:
-        sig with the timestamp added
-    """
-    signature = der_encode(sig["signerInfos"][0]["encryptedDigest"])
-    ts = get_old_timestamp(signature, timestamp_url)
-    # Use SequenceOf here to force the order to what we want
-    # Assuming this should be in the order of the validity
-    # TODO: Not sure if this is correct, but seems to work
-    certificates = univ.SequenceOf(ExtendedCertificateOrCertificate()).subtype(
-        implicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatConstructed, 0)
-    )
-    certificates.extend(sig["certificates"])
-    for cert in sorted(
-        ts["certificates"],
-        key=lambda c: c["certificate"]["tbsCertificate"]["validity"]["notBefore"],
-    ):
-        certificates.append(cert)
-    sig["certificates"] = certificates
-
-    i = len(sig["signerInfos"][0]["unauthenticatedAttributes"])
-    sig["signerInfos"][0]["unauthenticatedAttributes"][i]["type"] = id_counterSignature
-    sig["signerInfos"][0]["unauthenticatedAttributes"][i]["values"][0] = ts[
-        "signerInfos"
-    ][0]
-
-    return sig
-
-
-def get_signatures_from_certificates(certificates):
-    retval = []
-    for cert in certificates:
-        ci, _ = der_decode(cert["data"], ContentInfo())
-        signed_data, _ = der_decode(ci["content"], SignedData())
-        spc, _ = der_decode(
-            signed_data["contentInfo"]["content"], SpcIndirectDataContent()
+def get_dummy_signature(infile, digest_algo, url=None, comment=None, crosscert=None):
+    with tmpdir() as d:
+        cert_file = d / "cert.pem"
+        cert_file.write_text(DUMMY_KEY)
+        infile = Path(infile)
+        dest = d / ("signed1" + infile.suffix)
+        sign_file(
+            infile,
+            dest,
+            cert_file,
+            cert_file,
+            digest_algo,
+            url=url,
+            comment=comment,
+            crosscert=crosscert,
         )
-        signed_data["contentInfo"]["content"] = spc
-        retval.append(signed_data)
-    return retval
+        sig = d / "signature"
+        extract_signature(dest, sig)
+        return pem_to_der(sig.read_bytes())
+
+
+def write_signature(infile, outfile, sig):
+    # PE files need their signatures encapsulated
+    if is_pefile(infile):
+        padlen = (8 - len(sig) % 8) % 8
+        sig += b"\x00" * padlen
+        cert = certificate.build(
+            {"size": len(sig) + 8, "revision": "REV2", "certtype": "PKCS7", "data": sig}
+        )
+    else:
+        cert = sig
+    with tempfile.NamedTemporaryFile() as sigfile:
+        sigfile.write(cert)
+        sigfile.flush()
+        cmd = [
+            "attach-signature",
+            "-sigin",
+            sigfile.name,
+            "-in",
+            infile,
+            "-out",
+            outfile,
+        ]
+        osslsigncode(cmd)
+
+
+def winsign(
+    infile, outfile, digest_algo, cert, signer, url=None, comment=None, crosscert=None
+):
+    try:
+        log.debug("Generating dummy signature")
+        old_sig = get_dummy_signature(
+            infile, digest_algo, url=url, comment=comment, crosscert=crosscert
+        )
+    except OSError:
+        log.error("Couldn't generate dummy signature")
+        log.debug("Exception:", exc_info=True)
+        return False
+
+    try:
+        log.debug("Re-signing with real keys")
+        old_sig = get_signeddata(old_sig)
+        certs = [cert]
+        if crosscert:
+            certs.append(load_pem_cert(crosscert.read_bytes()))
+        newsig = resign(old_sig, certs, signer)
+    except Exception:
+        log.error("Couldn't re-sign")
+        log.debug("Exception:", exc_info=True)
+        return False
+
+    try:
+        log.debug("Attaching new signature")
+        write_signature(infile, outfile, newsig)
+    except Exception:
+        log.error("Couldn't write new signature")
+        log.debug("Exception:", exc_info=True)
+        return False
+
+    log.debug("Done!")
+    return True
+
+
+def build_parser():
+    parser = ArgumentParser()
+    parser.add_argument("infile", help="unsigned file to sign")
+    parser.add_argument(
+        "outfile",
+        help="where to write output to. defaults to infile",
+        default=None,
+        nargs="?",
+    )
+    parser.add_argument(
+        "--certs",
+        dest="certs",
+        help="certificates to include in the signature",
+        required=True,
+    )
+    parser.add_argument("--key", dest="priv_key", help="private key used to sign")
+    parser.add_argument(
+        "--autograph-url",
+        dest="autograph_url",
+        help="url for autograph authentication. defaults to $AUTOGRAPH_URL",
+        default=os.environ.get("AUTOGRAPH_URL"),
+    )
+    parser.add_argument(
+        "--autograph-user",
+        dest="autograph_user",
+        help="user for autograph authentication. defaults to $AUTOGRAPH_USER",
+        default=os.environ.get("AUTOGRAPH_USER"),
+    )
+    parser.add_argument(
+        "--autograph-secret",
+        dest="autograph_secret",
+        help="secret for autograph authentication. defaults to $AUTOGRAPH_SECRET",
+        default=os.environ.get("AUTOGRAPH_SECRET"),
+    )
+
+    parser.add_argument("-n", dest="comment", help="comment to include in signature")
+    parser.add_argument("-i", dest="url", help="url to include in signature")
+    parser.add_argument(
+        "-d",
+        dest="digest_algo",
+        help="digest to use for signing. must be one of sha1 or sha256",
+        choices=["sha1", "sha256"],
+        required=True,
+    )
+    parser.add_argument("-t", dest="timestamp", choices=["old", "rfc3161"])
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="loglevel",
+        action="store_const",
+        const=logging.DEBUG,
+        default=logging.INFO,
+    )
+    parser.add_argument(
+        "-q", "--quiet", dest="loglevel", action="store_const", const=logging.WARNING
+    )
+    return parser
+
+
+def copy_stream(instream, outstream):
+    while True:
+        block = instream.read(1024 ** 2)
+        if not block:
+            break
+        outstream.write(block)
+
+
+def main(argv=None):
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    logging.basicConfig(format="%(asctime)s - %(message)s", level=args.loglevel)
+
+    if not args.priv_key:
+        if not (args.autograph_user and args.autograph_secret):
+            parser.error(
+                "--key, or all of --autograph-url, --autograph-user, and "
+                "--autograph-secret must be specified"
+            )
+
+    if not args.outfile:
+        args.outfile = args.infile
+
+    cert = load_pem_cert(open(args.certs, "rb").read())
+    if args.priv_key:
+        priv_key = load_private_key(open(args.priv_key, "rb").read())
+
+        def signer(digest, digest_algo):
+            log.debug(
+                "signing %s with %s",
+                hexlify(digest),
+                priv_key.public_key().public_numbers(),
+            )
+            return sign_signer_digest(priv_key, digest_algo, digest)
+
+    else:
+        # Sign with autograph
+        def signer(digest, digest_algo):
+            log.debug("signing with autograph")
+            return False
+
+    with tmpdir() as d:
+        if args.infile == "-":
+            args.infile = d / "unsigned"
+            with args.infile.open("wb") as f:
+                copy_stream(sys.stdin.buffer, f)
+
+        if args.outfile == "-":
+            outfile = d / "signed"
+        else:
+            outfile = args.outfile
+
+        r = winsign(
+            args.infile,
+            outfile,
+            args.digest_algo,
+            cert,
+            signer,
+            url=args.url,
+            comment=args.comment,
+        )
+
+        # TODO: Timestamps
+        # TODO: Extra cross-cert
+        # TODO: Check with a cert chain
+        if not r:
+            return 1
+
+        if args.outfile == "-":
+            with outfile.open("rb") as f:
+                copy_stream(f, sys.stdout.buffer)
+
+        return 0

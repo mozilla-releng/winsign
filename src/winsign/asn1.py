@@ -1,33 +1,25 @@
+import hashlib
+import logging
+from binascii import hexlify
+
+from pyasn1.codec.der.decoder import decode as der_decode
+from pyasn1.codec.der.encoder import encode as der_encode
 from pyasn1.type import char, namedtype, namedval, tag, univ
-from pyasn1_modules.rfc2315 import DigestAlgorithmIdentifier, DigestInfo
+from pyasn1_modules.rfc2315 import (
+    Attribute,
+    Certificate,
+    ContentInfo,
+    DigestInfo,
+    SignedData,
+    SignerInfo,
+    TBSCertificate,
+)
+
+log = logging.getLogger(__name__)
 
 id_sha1 = univ.ObjectIdentifier("1.3.14.3.2.26")
-algo_sha1 = (
-    DigestAlgorithmIdentifier()
-    .setComponentByName("algorithm", id_sha1)
-    .setComponentByName("parameters", univ.Null(""))
-)
-
 id_sha256 = univ.ObjectIdentifier("2.16.840.1.101.3.4.2.1")
-algo_sha256 = (
-    DigestAlgorithmIdentifier()
-    .setComponentByName("algorithm", id_sha256)
-    .setComponentByName("parameters", univ.Null(""))
-)
-
-ASN_DIGEST_ALGO_MAP = {"sha1": algo_sha1, "sha256": algo_sha256}
-
-id_contentType = univ.ObjectIdentifier("1.2.840.113549.1.9.3")
-id_messageDigest = univ.ObjectIdentifier("1.2.840.113549.1.9.4")
-id_signingTime = univ.ObjectIdentifier("1.2.840.113549.1.9.5")
-id_counterSignature = univ.ObjectIdentifier("1.2.840.113549.1.9.6")
-id_spcIndirectDataContext = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.4")
-id_spcStatementType = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.11")
-id_individualCodeSigning = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.21")
 id_signedData = univ.ObjectIdentifier("1.2.840.113549.1.7.2")
-id_spcSpOpusInfo = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.12")
-id_rsaEncryption = univ.ObjectIdentifier("1.2.840.113549.1.1.1")
-id_timestampSignature = univ.ObjectIdentifier("1.3.6.1.4.1.311.3.3.1")
 
 
 class SpcString(univ.Choice):
@@ -121,44 +113,85 @@ class SpcIndirectDataContent(univ.Sequence):
     )
 
 
-class SpcContentInfo(univ.Sequence):
-    componentType = namedtype.NamedTypes(
-        namedtype.NamedType(
-            "contentType", univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.4")
-        ),
-        namedtype.OptionalNamedType(
-            "spc",
-            SpcIndirectDataContent().subtype(
-                explicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatConstructed, 0)
-            ),
-        ),
-    )
+def calc_signerinfo_digest(signer_info, digest_algo):
+    auth_attrs = univ.SetOf(componentType=Attribute())
+    for i, v in enumerate(signer_info["authenticatedAttributes"]):
+        auth_attrs[i] = v
+    auth_attrs_encoded = der_encode(auth_attrs)
+
+    return hashlib.new(digest_algo, auth_attrs_encoded).digest()
 
 
-def der_header_length(encoded):
-    """
-    Returns the length of the header of a DER encoded object.
+def x509_to_pkcs7(cert):
+    tbsCert, _ = der_decode(cert.tbs_certificate_bytes, TBSCertificate())
+    retval = Certificate()
+    retval["tbsCertificate"] = tbsCert
+    retval["signatureAlgorithm"][
+        "algorithm"
+    ] = cert.signature_algorithm_oid.dotted_string
+    retval["signatureAlgorithm"]["parameters"] = univ.Null("")
+    retval["signatureValue"] = univ.BitString.fromHexString(hexlify(cert.signature))
+    return retval
 
-    Arguments:
-        encoded (bytes): DER encoded bytestring
 
-    Returns:
-        length (int)
-    """
-    hlen = 1
-    i = 0
-    tag = encoded[i]
-    # If the tag isn't universal, it may take more than one byte
-    if tag & 0b11000000 != 0 and tag & 0b11111 == 0b11111:
-        hlen += 1
-        i += 1
-        while encoded[i] & 0b10000000:
-            hlen += 1
-            i += 1
+def copy_signer_info(old_si, pkcs7_cert):
+    si = SignerInfo()
+    si["authenticatedAttributes"] = old_si["authenticatedAttributes"]
+    si["version"] = old_si["version"]
+    si["digestAlgorithm"] = old_si["digestAlgorithm"]
+    si["digestEncryptionAlgorithm"] = old_si["digestEncryptionAlgorithm"]
 
-    length = encoded[i]
-    hlen += 1
-    if length & 0b10000000:
-        hlen += int(length & 0b01111111)
+    si["issuerAndSerialNumber"]["issuer"] = pkcs7_cert["tbsCertificate"]["issuer"]
+    si["issuerAndSerialNumber"]["serialNumber"] = pkcs7_cert["tbsCertificate"][
+        "serialNumber"
+    ]
+    return si
 
-    return hlen
+
+def resign(old_sig, certs, signer):
+    new_sig = SignedData()
+    new_sig["version"] = old_sig["version"]
+    new_sig["contentInfo"] = old_sig["contentInfo"]
+
+    new_sig["digestAlgorithms"] = old_sig["digestAlgorithms"]
+
+    for i, cert in enumerate(certs):
+        pkcs7_cert = x509_to_pkcs7(cert)
+        new_sig["certificates"][i]["certificate"] = pkcs7_cert
+
+    new_si = copy_signer_info(old_sig["signerInfos"][0], pkcs7_cert)
+    if new_si["digestAlgorithm"]["algorithm"] == id_sha1:
+        digest_algo = "sha1"
+    elif new_si["digestAlgorithm"]["algorithm"] == id_sha256:
+        digest_algo = "sha256"
+    signer_digest = calc_signerinfo_digest(new_si, digest_algo)
+    log.debug("Digest to sign is: %s", hexlify(signer_digest))
+    new_si["encryptedDigest"] = signer(signer_digest, digest_algo)
+    new_sig["signerInfos"][0] = new_si
+
+    ci = ContentInfo()
+    ci["contentType"] = id_signedData
+    ci["content"] = new_sig
+    sig = der_encode(ci)
+
+    return sig
+
+
+def get_signeddata(s):
+    """Gets the SignedData from an encoded ContentInfo object"""
+    ci = der_decode(s, ContentInfo())[0]
+    sd = der_decode(ci["content"], SignedData())[0]
+    return sd
+
+
+def get_signatures_from_certificates(certificates):
+    retval = []
+    for cert in certificates:
+        ci, _ = der_decode(cert["data"], ContentInfo())
+        signed_data, _ = der_decode(ci["content"], SignedData())
+        spc, _ = der_decode(
+            signed_data["contentInfo"]["content"], SpcIndirectDataContent()
+        )
+        signed_data["contentInfo"]["content"] = spc
+        retval.append(signed_data)
+    return retval
