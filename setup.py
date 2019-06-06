@@ -49,4 +49,5 @@ setup(
     url="https://github.com/catlee/winsign",
     version="0.1.0",
     zip_safe=False,
+    entry_points={"console_scripts": ["winsign = winsign.osslsign:main"]},
 )

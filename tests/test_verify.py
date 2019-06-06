@@ -1,10 +1,10 @@
 import pytest
 import winsign.verify
-from common import TEST_FILES
+from common import TEST_PE_FILES
 from winsign.pefile import pefile
 
 
-@pytest.mark.parametrize("test_file", TEST_FILES)
+@pytest.mark.parametrize("test_file", TEST_PE_FILES)
 @pytest.mark.parametrize(
     "verify_func",
     [
@@ -24,7 +24,7 @@ def test_verify_pefile(test_file, verify_func):
         assert res, messages
 
 
-@pytest.mark.parametrize("test_file", TEST_FILES)
+@pytest.mark.parametrize("test_file", TEST_PE_FILES)
 def test_verify_pefile_checksum(test_file):
     "Check that all our test files checksums are valid"
     with test_file.open("rb") as f:

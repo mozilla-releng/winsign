@@ -1,5 +1,5 @@
 import pytest
-from common import DATA_DIR, TEST_FILES
+from common import DATA_DIR, TEST_PE_FILES
 from winsign.pefile import calc_checksum, calc_checksum_slow, pefile
 
 KNOWN_CHECKSUMS = {DATA_DIR / "signed.exe": 0x000A76B5}
@@ -8,7 +8,7 @@ KNOWN_CHECKSUMS = {DATA_DIR / "signed.exe": 0x000A76B5}
 @pytest.mark.skipif(
     calc_checksum == calc_checksum_slow, reason="no fast checksum available"
 )
-@pytest.mark.parametrize("test_file", TEST_FILES)
+@pytest.mark.parametrize("test_file", TEST_PE_FILES)
 def test_calc_checksum_fastslow(test_file):
     "Checks that the fast and slow checksum implementations return the same result."
     with test_file.open("rb") as f:

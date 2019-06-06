@@ -2,7 +2,8 @@ import subprocess
 from binascii import hexlify
 
 import pytest
-from common import DATA_DIR, EXPECTED_SIGNATURES, TEST_FILES
+import winsign.osslsign as osslsign
+from common import DATA_DIR, EXPECTED_SIGNATURES, TEST_MSI_FILES, TEST_PE_FILES
 from pyasn1.codec.der.encoder import encode as der_encode
 from winsign.asn1 import id_signingTime
 from winsign.pefile import add_signature, calc_authenticode_digest, get_certificates
@@ -11,6 +12,7 @@ from winsign.sign import (
     add_rfc3161_timestamp,
     get_authenticode_signature,
     get_signatures_from_certificates,
+    sign_signer_digest,
 )
 from winsign.verify import verify_pefile
 from winsign.x509 import decode_key, load_pem_cert
@@ -75,7 +77,7 @@ def get_signing_time(certificates):
     return signing_time
 
 
-@pytest.mark.parametrize("test_file", TEST_FILES)
+@pytest.mark.parametrize("test_file", TEST_PE_FILES)
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
 def test_signature_parity(test_file, digest_algo, tmp_path, signing_keys):
     """
@@ -102,7 +104,7 @@ def test_signature_parity(test_file, digest_algo, tmp_path, signing_keys):
         assert sig == certificates[0]["data"]
 
 
-@pytest.mark.parametrize("test_file", TEST_FILES)
+@pytest.mark.parametrize("test_file", TEST_PE_FILES)
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
 def test_attach_signature(test_file, digest_algo, tmp_path, signing_keys):
     "Check that we can validly attach signatures we generate"
@@ -132,7 +134,7 @@ def test_attach_signature(test_file, digest_algo, tmp_path, signing_keys):
 # TODO: This test should fail. We're hardcoding the timestamp response for the wrong
 # file, and osslsigncode isn't failing to verify
 @pytest.mark.parametrize("test_file", EXPECTED_SIGNATURES.keys())
-# @pytest.mark.parametrize("test_file", TEST_FILES)
+# @pytest.mark.parametrize("test_file", TEST_PE_FILES)
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
 def test_attach_signature_rfc3161_timestamp(
     test_file, digest_algo, tmp_path, signing_keys, httpserver
@@ -165,7 +167,7 @@ def test_attach_signature_rfc3161_timestamp(
 # TODO: This test should fail. We're hardcoding the timestamp response for the wrong
 # file, and osslsigncode isn't failing to verify
 @pytest.mark.parametrize("test_file", EXPECTED_SIGNATURES.keys())
-# @pytest.mark.parametrize("test_file", TEST_FILES)
+# @pytest.mark.parametrize("test_file", TEST_PE_FILES)
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
 def test_attach_signature_old_timestamp(
     test_file, digest_algo, tmp_path, signing_keys, httpserver
@@ -195,7 +197,7 @@ def test_attach_signature_old_timestamp(
     # check this
 
 
-@pytest.mark.parametrize("test_file", TEST_FILES)
+@pytest.mark.parametrize("test_file", TEST_PE_FILES)
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
 def test_calc_digest(test_file, digest_algo, tmp_path, signing_keys):
     """
@@ -280,7 +282,60 @@ def test_signature_parity_old_timestamp(
         sig = der_encode(sig)
         padlen = (8 - len(sig) % 8) % 8
         sig += b"\x00" * padlen
-        # For easier debugging, write out the signatures separately so we can compare them after
+        # For easier debugging, write out the signatures separately so we can
+        # compare them after
         # (tmp_path / "orig.sig").write_bytes(certificates[0]["data"])
         # (tmp_path / "new.sig").write_bytes(sig)
         assert sig == certificates[0]["data"], "signatures differ"
+
+
+@pytest.mark.parametrize("test_file", TEST_PE_FILES + TEST_MSI_FILES)
+def test_osslsign_winsign(test_file, tmp_path, signing_keys):
+    """
+    Check that we can sign with the osslsign wrapper
+    """
+    signed_exe = tmp_path / "signed.exe"
+
+    priv_key = decode_key(open(signing_keys[0], "rb").read())
+    cert = load_pem_cert(signing_keys[1].read_bytes())
+
+    def signer(digest, digest_algo):
+        return sign_signer_digest(priv_key, digest_algo, digest)
+
+    assert osslsign.winsign(test_file, signed_exe, "sha1", cert, signer)
+
+    # Check that we have 1 certificate in the signature
+    if osslsign.is_pefile(test_file):
+        with signed_exe.open("rb") as f:
+            certificates = get_certificates(f)
+            sigs = get_signatures_from_certificates(certificates)
+            assert len(certificates) == 1
+            assert len(sigs) == 1
+            assert len(sigs[0]["certificates"]) == 1
+
+
+def test_osslsign_winsign_dummy(tmp_path, signing_keys):
+    """
+    Check that we can sign with an additional dummy certificate for use by the
+    stub installer
+    """
+    test_file = DATA_DIR / "unsigned.exe"
+    signed_exe = tmp_path / "signed.exe"
+
+    priv_key = decode_key(open(signing_keys[0], "rb").read())
+    cert = load_pem_cert(signing_keys[1].read_bytes())
+
+    def signer(digest, digest_algo):
+        return sign_signer_digest(priv_key, digest_algo, digest)
+
+    assert osslsign.winsign(
+        test_file, signed_exe, "sha1", cert, signer, crosscert=signing_keys[1]
+    )
+
+    # Check that we have 2 certificates in the signature
+    with signed_exe.open("rb") as f:
+        certificates = get_certificates(f)
+        sigs = get_signatures_from_certificates(certificates)
+        assert len(certificates) == 1
+        assert len(sigs) == 1
+        assert len(sigs[0]["certificates"]) == 2
