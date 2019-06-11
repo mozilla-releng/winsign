@@ -2,14 +2,16 @@
 
 dist: xenial  # For Python 3.7
 language: python
+services:
+    - docker
 python:
   - 3.8-dev
   - 3.7
   - 3.6
 
 before_install:
-    - sudo apt-get update
-    - sudo apt-get -y install 'osslsigncode=2.0-1'
+    - docker build -t winsign .
+    - docker run winsign /bin/sh -c "tox"
 
 # Command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 install: pip install -U tox-travis

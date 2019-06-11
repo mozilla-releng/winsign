@@ -5,6 +5,7 @@ include README.rst
 include CODE_OF_CONDUCT.md
 include tox.ini
 include TODO
+include Dockerfile
 
 recursive-include requirements *.in
 recursive-include requirements *.txt
