@@ -1,0 +1,54 @@
+version: 1
+policy:
+  pullRequests: public
+tasks:
+  $let:
+    head_rev:
+      $if: 'tasks_for == "github-pull-request"'
+      then: ${event.pull_request.head.sha}
+      else:
+        $if: 'tasks_for == "github-push"'
+        then: ${event.after}
+        else: ${event.release.tag_name}
+
+    repository:
+      $if: 'tasks_for == "github-pull-request"'
+      then: ${event.pull_request.head.repo.html_url}
+      else: ${event.repository.html_url}
+
+    owner: ${event.sender.login}@users.noreply.github.com
+
+  in:
+    $map: [['py37', '3.7.3'], ['py36', '3.6.3'], ['py38', '3.8-dev']]
+    each(py):
+      taskId: '${as_slugid(py[0])}'
+      provisionerId: aws-provisioner-v1
+      workerType: github-worker
+      created: {$fromNow: ''}
+      deadline: {$fromNow: '4 hours'}
+      payload:
+        maxRunTime: 3600
+        image: debian:buster
+        command:
+          - sh
+          - -lxce
+          - >-
+            apt-get update && apt-get -y upgrade &&
+            apt-get install -y make build-essential libssl-dev zlib1g-dev libbz2-dev \
+                libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev libncursesw5-dev \
+                xz-utils tk-dev libffi-dev liblzma-dev python-openssl \
+                osslsigncode tox git &&
+            git clone ${repository} /src &&
+            cd /src &&
+            git config advice.detachedHead false &&
+            git checkout ${head_rev} &&
+            git clone git://github.com/yyuu/pyenv.git /root/.pyenv &&
+            PYENV_ROOT=/root/.pyenv PATH=$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH pyenv install ${py[1]} &&
+            PATH=/root/.pyenv/versions/${py[1]}/bin:$PATH tox -e ${py[0]},check,report
+
+
+      metadata:
+        name: tox ${py[0]}
+        description: code linting & unit tests on ${py[0]}
+        owner: ${owner}
+        source: ${repository}/raw/${head_rev}/.taskcluster.yml

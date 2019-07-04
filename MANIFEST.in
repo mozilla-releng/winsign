@@ -24,3 +24,4 @@ recursive-include tests *.exe
 recursive-include tests *.py
 
 include .isort.cfg
+exclude .taskcluster.yml
