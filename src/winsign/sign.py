@@ -11,7 +11,16 @@ from binascii import hexlify
 from contextlib import contextmanager
 from pathlib import Path
 
-from winsign.asn1 import get_signeddata, resign
+import winsign.timestamp
+from winsign.asn1 import (
+    ContentInfo,
+    SignedData,
+    der_decode,
+    der_encode,
+    get_signeddata,
+    id_signedData,
+    resign,
+)
 from winsign.crypto import load_pem_cert, load_private_key, sign_signer_digest
 from winsign.pefile import certificate, is_pefile
 
@@ -97,8 +106,17 @@ def osslsigncode(args):
         raise OSError("osslsigncode failed")
 
 
-def sign_file(
-    infile, outfile, cert, key, digest_algo, url=None, comment=None, crosscert=None
+def run_sign_command(
+    infile,
+    outfile,
+    cert,
+    key,
+    digest_algo,
+    url=None,
+    comment=None,
+    crosscert=None,
+    timestamp_style=None,
+    timestamp_url=None,
 ):
     cmd = [
         "sign",
@@ -119,6 +137,10 @@ def sign_file(
         cmd += ["-n", comment]
     if crosscert:
         cmd += ["-ac", crosscert]
+    if timestamp_style == "old":
+        cmd += ["-t", timestamp_url]
+    elif timestamp_style == "rfc3161":
+        cmd += ["-ts", timestamp_url]
 
     osslsigncode(cmd)
 
@@ -134,7 +156,7 @@ def get_dummy_signature(infile, digest_algo, url=None, comment=None, crosscert=N
         cert_file.write_text(DUMMY_KEY)
         infile = Path(infile)
         dest = d / ("signed1" + infile.suffix)
-        sign_file(
+        run_sign_command(
             infile,
             dest,
             cert_file,
@@ -174,8 +196,17 @@ def write_signature(infile, outfile, sig):
         osslsigncode(cmd)
 
 
-def winsign(
-    infile, outfile, digest_algo, cert, signer, url=None, comment=None, crosscert=None
+def sign_file(
+    infile,
+    outfile,
+    digest_algo,
+    cert,
+    signer,
+    url=None,
+    comment=None,
+    crosscert=None,
+    timestamp_style=None,
+    timestamp_url=None,
 ):
     try:
         log.debug("Generating dummy signature")
@@ -198,6 +229,23 @@ def winsign(
         log.error("Couldn't re-sign")
         log.debug("Exception:", exc_info=True)
         return False
+
+    if timestamp_style == "old":
+        ci = der_decode(newsig, ContentInfo())[0]
+        sig = der_decode(ci["content"], SignedData())[0]
+        sig = winsign.timestamp.add_old_timestamp(sig, timestamp_url)
+        ci = ContentInfo()
+        ci["contentType"] = id_signedData
+        ci["content"] = sig
+        newsig = der_encode(ci)
+    elif timestamp_style == "rfc3161":
+        ci = der_decode(newsig, ContentInfo())[0]
+        sig = der_decode(ci["content"], SignedData())[0]
+        sig = winsign.timestamp.add_rfc3161_timestamp(sig, digest_algo, timestamp_url)
+        ci = ContentInfo()
+        ci["contentType"] = id_signedData
+        ci["content"] = sig
+        newsig = der_encode(ci)
 
     try:
         log.debug("Attaching new signature")
@@ -317,13 +365,15 @@ def main(argv=None):
             args.infile = d / "unsigned"
             with args.infile.open("wb") as f:
                 copy_stream(sys.stdin.buffer, f)
+        else:
+            args.infile = Path(args.infile)
 
         if args.outfile == "-":
             outfile = d / "signed"
         else:
-            outfile = args.outfile
+            outfile = Path(args.outfile)
 
-        r = winsign(
+        r = sign_file(
             args.infile,
             outfile,
             args.digest_algo,
@@ -331,9 +381,9 @@ def main(argv=None):
             signer,
             url=args.url,
             comment=args.comment,
+            timestamp_style=args.timestamp,
         )
 
-        # TODO: Timestamps
         # TODO: Extra cross-cert
         # TODO: Check with a cert chain
         if not r:

@@ -9,6 +9,7 @@ from pyasn1_modules.rfc2315 import (
     Attribute,
     Certificate,
     ContentInfo,
+    DigestAlgorithmIdentifier,
     DigestInfo,
     SignedData,
     SignerInfo,
@@ -20,6 +21,23 @@ log = logging.getLogger(__name__)
 id_sha1 = univ.ObjectIdentifier("1.3.14.3.2.26")
 id_sha256 = univ.ObjectIdentifier("2.16.840.1.101.3.4.2.1")
 id_signedData = univ.ObjectIdentifier("1.2.840.113549.1.7.2")
+id_timestampSignature = univ.ObjectIdentifier("1.3.6.1.4.1.311.3.3.1")
+id_counterSignature = univ.ObjectIdentifier("1.2.840.113549.1.9.6")
+
+
+algo_sha1 = (
+    DigestAlgorithmIdentifier()
+    .setComponentByName("algorithm", id_sha1)
+    .setComponentByName("parameters", univ.Null(""))
+)
+
+algo_sha256 = (
+    DigestAlgorithmIdentifier()
+    .setComponentByName("algorithm", id_sha256)
+    .setComponentByName("parameters", univ.Null(""))
+)
+
+ASN_DIGEST_ALGO_MAP = {"sha1": algo_sha1, "sha256": algo_sha256}
 
 
 class SpcString(univ.Choice):
@@ -148,7 +166,41 @@ def copy_signer_info(old_si, pkcs7_cert):
     return si
 
 
+def get_signeddata(s):
+    """Gets the SignedData from an encoded ContentInfo object"""
+    ci = der_decode(s, ContentInfo())[0]
+    sd = der_decode(ci["content"], SignedData())[0]
+    return sd
+
+
+def get_signatures_from_certificates(certificates):
+    retval = []
+    for cert in certificates:
+        ci, _ = der_decode(cert["data"], ContentInfo())
+        signed_data, _ = der_decode(ci["content"], SignedData())
+        spc, _ = der_decode(
+            signed_data["contentInfo"]["content"], SpcIndirectDataContent()
+        )
+        signed_data["contentInfo"]["content"] = spc
+        retval.append(signed_data)
+    return retval
+
+
 def resign(old_sig, certs, signer):
+    """
+    Replaces the encrypted signature digest in the given signature with new one
+    generated with the given signer function.
+
+    Args:
+        old_sig (SignedData): the original signature as a SignedData object
+        certs (list of x509 certificates): certificates to attach to the new signature
+        signer (function): function to call to generate the new encrypted
+                           digest. The function is passed two arguments: (signer_digest,
+                           digest_algo)
+
+    Returns:
+        ContentInfo object with the new signature embedded
+    """
     new_sig = SignedData()
     new_sig["version"] = old_sig["version"]
     new_sig["contentInfo"] = old_sig["contentInfo"]
@@ -175,23 +227,3 @@ def resign(old_sig, certs, signer):
     sig = der_encode(ci)
 
     return sig
-
-
-def get_signeddata(s):
-    """Gets the SignedData from an encoded ContentInfo object"""
-    ci = der_decode(s, ContentInfo())[0]
-    sd = der_decode(ci["content"], SignedData())[0]
-    return sd
-
-
-def get_signatures_from_certificates(certificates):
-    retval = []
-    for cert in certificates:
-        ci, _ = der_decode(cert["data"], ContentInfo())
-        signed_data, _ = der_decode(ci["content"], SignedData())
-        spc, _ = der_decode(
-            signed_data["contentInfo"]["content"], SpcIndirectDataContent()
-        )
-        signed_data["contentInfo"]["content"] = spc
-        retval.append(signed_data)
-    return retval
