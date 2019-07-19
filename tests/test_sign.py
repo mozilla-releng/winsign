@@ -2,7 +2,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from common import DATA_DIR, TEST_MSI_FILES, TEST_PE_FILES, EXPECTED_SIGNATURES
+from common import DATA_DIR, EXPECTED_SIGNATURES, TEST_MSI_FILES, TEST_PE_FILES
 from winsign.asn1 import get_signatures_from_certificates, id_timestampSignature
 from winsign.crypto import load_pem_cert, load_private_key, sign_signer_digest
 from winsign.pefile import is_pefile, pefile

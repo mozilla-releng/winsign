@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import base64
 import logging
 import os
 import shutil
@@ -78,12 +77,6 @@ Iq4ITEtYW5tfl1hf8AyEmz0=
 """
 
 
-def pem_to_der(pem):
-    lines = [line for line in pem.split(b"\n") if not line.startswith(b"----")]
-    b64 = b"".join(lines)
-    return base64.b64decode(b64)
-
-
 @contextmanager
 def tmpdir():
     try:
@@ -146,7 +139,7 @@ def run_sign_command(
 
 
 def extract_signature(infile, sigfile):
-    cmd = ["extract-signature", "-in", infile, "-out", sigfile, "-pem"]
+    cmd = ["extract-signature", "-in", infile, "-out", sigfile]
     osslsigncode(cmd)
 
 
@@ -168,7 +161,11 @@ def get_dummy_signature(infile, digest_algo, url=None, comment=None, crosscert=N
         )
         sig = d / "signature"
         extract_signature(dest, sig)
-        return pem_to_der(sig.read_bytes())
+        if is_pefile(infile):
+            pefile_cert = certificate.parse(sig.read_bytes())
+            return pefile_cert.data
+        else:
+            return sig.read_bytes()
 
 
 def write_signature(infile, outfile, sig):
