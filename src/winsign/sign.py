@@ -205,6 +205,8 @@ def sign_file(
     timestamp_style=None,
     timestamp_url=None,
 ):
+    infile = Path(infile)
+    outfile = Path(outfile)
     try:
         log.debug("Generating dummy signature")
         old_sig = get_dummy_signature(
