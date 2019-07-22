@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import base64
 import logging
 import os
 import shutil
@@ -9,12 +10,10 @@ from argparse import ArgumentParser
 from binascii import hexlify
 from contextlib import contextmanager
 from pathlib import Path
-import base64
 
 import requests
-from requests_hawk import HawkAuth
-
 import winsign.timestamp
+from requests_hawk import HawkAuth
 from winsign.asn1 import (
     ContentInfo,
     SignedData,
@@ -372,15 +371,16 @@ def main(argv=None):
             log.debug(f"signing with autograph at {url}")
             request_json = {"input": base64.b64encode(digest).decode("ascii")}
             if args.autograph_keyid:
-                request_json['keyid'] = args.autograph_keyid
+                request_json["keyid"] = args.autograph_keyid
 
             with requests.Session() as session:
                 r = session.post(url, json=[request_json], auth=auth)
                 log.debug(
-                    "Autograph response: %s", r.text[:120] if len(r.text) >= 120 else r.text
+                    "Autograph response: %s",
+                    r.text[:120] if len(r.text) >= 120 else r.text,
                 )
                 r.raise_for_status()
-                return base64.b64decode(r.json()[0]['signature'])
+                return base64.b64decode(r.json()[0]["signature"])
 
     with tmpdir() as d:
         if args.infile == "-":
