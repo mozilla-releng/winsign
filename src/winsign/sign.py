@@ -9,6 +9,10 @@ from argparse import ArgumentParser
 from binascii import hexlify
 from contextlib import contextmanager
 from pathlib import Path
+import base64
+
+import requests
+from requests_hawk import HawkAuth
 
 import winsign.timestamp
 from winsign.asn1 import (
@@ -292,6 +296,12 @@ def build_parser():
         help="secret for autograph authentication. defaults to $AUTOGRAPH_SECRET",
         default=os.environ.get("AUTOGRAPH_SECRET"),
     )
+    parser.add_argument(
+        "--autograph-keyid",
+        dest="autograph_keyid",
+        help="keyid for autograph. defaults to $AUTOGRAPH_KEYID",
+        default=os.environ.get("AUTOGRAPH_KEYID"),
+    )
 
     parser.add_argument("-n", dest="comment", help="comment to include in signature")
     parser.add_argument("-i", dest="url", help="url to include in signature")
@@ -355,9 +365,22 @@ def main(argv=None):
 
     else:
         # Sign with autograph
+        auth = HawkAuth(id=args.autograph_user, key=args.autograph_secret)
+        url = f"{args.autograph_url}/sign/hash"
+
         def signer(digest, digest_algo):
-            log.debug("signing with autograph")
-            return False
+            log.debug(f"signing with autograph at {url}")
+            request_json = {"input": base64.b64encode(digest).decode("ascii")}
+            if args.autograph_keyid:
+                request_json['keyid'] = args.autograph_keyid
+
+            with requests.Session() as session:
+                r = session.post(url, json=[request_json], auth=auth)
+                log.debug(
+                    "Autograph response: %s", r.text[:120] if len(r.text) >= 120 else r.text
+                )
+                r.raise_for_status()
+                return base64.b64decode(r.json()[0]['signature'])
 
     with tmpdir() as d:
         if args.infile == "-":
