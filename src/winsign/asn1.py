@@ -211,7 +211,9 @@ def resign(old_sig, certs, signer):
         pkcs7_cert = x509_to_pkcs7(cert)
         new_sig["certificates"][i]["certificate"] = pkcs7_cert
 
-    new_si = copy_signer_info(old_sig["signerInfos"][0], pkcs7_cert)
+    new_si = copy_signer_info(
+        old_sig["signerInfos"][0], new_sig["certificates"][0]["certificate"]
+    )
     if new_si["digestAlgorithm"]["algorithm"] == id_sha1:
         digest_algo = "sha1"
     elif new_si["digestAlgorithm"]["algorithm"] == id_sha256:

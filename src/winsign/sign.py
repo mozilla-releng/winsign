@@ -23,7 +23,7 @@ from winsign.asn1 import (
     id_signedData,
     resign,
 )
-from winsign.crypto import load_pem_cert, load_private_key, sign_signer_digest
+from winsign.crypto import load_pem_certs, load_private_key, sign_signer_digest
 from winsign.pefile import certificate, is_pefile
 
 log = logging.getLogger(__name__)
@@ -200,7 +200,7 @@ def sign_file(
     infile,
     outfile,
     digest_algo,
-    cert,
+    certs,
     signer,
     url=None,
     comment=None,
@@ -223,9 +223,8 @@ def sign_file(
     try:
         log.debug("Re-signing with real keys")
         old_sig = get_signeddata(old_sig)
-        certs = [cert]
         if crosscert:
-            certs.append(load_pem_cert(crosscert.read_bytes()))
+            certs.extend(load_pem_certs(crosscert.read_bytes()))
         newsig = resign(old_sig, certs, signer)
     except Exception:
         log.error("Couldn't re-sign")
@@ -248,6 +247,8 @@ def sign_file(
         ci["contentType"] = id_signedData
         ci["content"] = sig
         newsig = der_encode(ci)
+
+    open("newsig.der", "wb").write(newsig)
 
     try:
         log.debug("Attaching new signature")
@@ -350,7 +351,9 @@ def main(argv=None):
     if not args.outfile:
         args.outfile = args.infile
 
-    cert = load_pem_cert(open(args.certs, "rb").read())
+    certs = []
+    certs_data = open(args.certs, "rb").read()
+    certs = load_pem_certs(certs_data)
     if args.priv_key:
         priv_key = load_private_key(open(args.priv_key, "rb").read())
 
@@ -399,7 +402,7 @@ def main(argv=None):
             args.infile,
             outfile,
             args.digest_algo,
-            cert,
+            certs,
             signer,
             url=args.url,
             comment=args.comment,

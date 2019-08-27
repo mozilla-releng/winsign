@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from common import DATA_DIR, EXPECTED_SIGNATURES, TEST_MSI_FILES, TEST_PE_FILES
 from winsign.asn1 import get_signatures_from_certificates, id_timestampSignature
-from winsign.crypto import load_pem_cert, load_private_key, sign_signer_digest
+from winsign.crypto import load_pem_certs, load_private_key, sign_signer_digest
 from winsign.pefile import is_pefile, pefile
 from winsign.sign import sign_file
 
@@ -49,12 +49,12 @@ def test_sign_file(test_file, tmp_path, signing_keys):
     signed_exe = tmp_path / "signed.exe"
 
     priv_key = load_private_key(open(signing_keys[0], "rb").read())
-    cert = load_pem_cert(signing_keys[1].read_bytes())
+    certs = load_pem_certs(signing_keys[1].read_bytes())
 
     def signer(digest, digest_algo):
         return sign_signer_digest(priv_key, digest_algo, digest)
 
-    assert sign_file(test_file, signed_exe, "sha1", cert, signer)
+    assert sign_file(test_file, signed_exe, "sha1", certs, signer)
 
     # Check that we have 1 certificate in the signature
     if is_pefile(test_file):
@@ -75,14 +75,38 @@ def test_sign_file_dummy(tmp_path, signing_keys):
     signed_exe = tmp_path / "signed.exe"
 
     priv_key = load_private_key(open(signing_keys[0], "rb").read())
-    cert = load_pem_cert(signing_keys[1].read_bytes())
+    certs = load_pem_certs(signing_keys[1].read_bytes())
 
     def signer(digest, digest_algo):
         return sign_signer_digest(priv_key, digest_algo, digest)
 
     assert sign_file(
-        test_file, signed_exe, "sha1", cert, signer, crosscert=signing_keys[1]
+        test_file, signed_exe, "sha1", certs, signer, crosscert=signing_keys[1]
     )
+
+    # Check that we have 2 certificates in the signature
+    with signed_exe.open("rb") as f:
+        certificates = get_certificates(f)
+        sigs = get_signatures_from_certificates(certificates)
+        assert len(certificates) == 1
+        assert len(sigs) == 1
+        assert len(sigs[0]["certificates"]) == 2
+
+
+def test_sign_file_twocerts(tmp_path, signing_keys):
+    """
+    Check that we can include multiple certificates
+    """
+    test_file = DATA_DIR / "unsigned.exe"
+    signed_exe = tmp_path / "signed.exe"
+
+    priv_key = load_private_key(open(signing_keys[0], "rb").read())
+    certs = load_pem_certs(open(DATA_DIR / "twocerts.pem", "rb").read())
+
+    def signer(digest, digest_algo):
+        return sign_signer_digest(priv_key, digest_algo, digest)
+
+    assert sign_file(test_file, signed_exe, "sha1", certs, signer)
 
     # Check that we have 2 certificates in the signature
     with signed_exe.open("rb") as f:
@@ -101,12 +125,12 @@ def test_sign_file_badfile(tmp_path, signing_keys):
     signed_file = tmp_path / "signed.py"
 
     priv_key = load_private_key(open(signing_keys[0], "rb").read())
-    cert = load_pem_cert(signing_keys[1].read_bytes())
+    certs = load_pem_certs(signing_keys[1].read_bytes())
 
     def signer(digest, digest_algo):
         return sign_signer_digest(priv_key, digest_algo, digest)
 
-    assert not sign_file(test_file, signed_file, "sha1", cert, signer)
+    assert not sign_file(test_file, signed_file, "sha1", certs, signer)
 
 
 @pytest.mark.parametrize("test_file", EXPECTED_SIGNATURES.keys())
@@ -117,7 +141,7 @@ def test_timestamp_old(test_file, tmp_path, signing_keys, httpserver):
     signed_exe = tmp_path / "signed.exe"
 
     priv_key = load_private_key(open(signing_keys[0], "rb").read())
-    cert = load_pem_cert(signing_keys[1].read_bytes())
+    certs = load_pem_certs(signing_keys[1].read_bytes())
 
     def signer(digest, digest_algo):
         return sign_signer_digest(priv_key, digest_algo, digest)
@@ -127,7 +151,7 @@ def test_timestamp_old(test_file, tmp_path, signing_keys, httpserver):
         test_file,
         signed_exe,
         "sha1",
-        cert,
+        certs,
         signer,
         timestamp_style="old",
         timestamp_url=httpserver.url,
@@ -151,7 +175,7 @@ def test_timestamp_rfc3161(test_file, tmp_path, signing_keys, httpserver):
     signed_exe = tmp_path / "signed.exe"
 
     priv_key = load_private_key(open(signing_keys[0], "rb").read())
-    cert = load_pem_cert(signing_keys[1].read_bytes())
+    certs = load_pem_certs(signing_keys[1].read_bytes())
 
     def signer(digest, digest_algo):
         return sign_signer_digest(priv_key, digest_algo, digest)
@@ -161,7 +185,7 @@ def test_timestamp_rfc3161(test_file, tmp_path, signing_keys, httpserver):
         test_file,
         signed_exe,
         "sha1",
-        cert,
+        certs,
         signer,
         timestamp_style="rfc3161",
         timestamp_url=httpserver.url,

@@ -14,9 +14,14 @@ with open("README.rst") as readme_file:
 with open("HISTORY.rst") as history_file:
     history = history_file.read()
 
-requirements = ["pyasn1", "cryptography",
-                "pyasn1_modules", "construct", "requests",
-                "requests_hawk"]
+requirements = [
+    "construct",
+    "cryptography",
+    "pyasn1",
+    "pyasn1_modules",
+    "requests",
+    "requests_hawk",
+]
 
 setup_requirements = ["pytest-runner"]
 

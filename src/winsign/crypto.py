@@ -22,3 +22,13 @@ def load_private_key(data):
 
 def load_pem_cert(pem_data):
     return x509.load_pem_x509_certificate(pem_data, default_backend())
+
+
+def load_pem_certs(pem_data):
+    certs = []
+    for cert in pem_data.split(b"-----BEGIN CERTIFICATE-----\n"):
+        if not cert:
+            continue
+        cert = b"-----BEGIN CERTIFICATE-----\n" + cert
+        certs.append(load_pem_cert(cert))
+    return certs
