@@ -5,13 +5,6 @@ winsign
 .. image:: https://img.shields.io/pypi/v/winsign.svg
         :target: https://pypi.python.org/pypi/winsign
 
-.. image:: https://img.shields.io/travis/mozilla-releng/winsign.svg
-        :target: https://travis-ci.org/mozilla-releng/winsign
-
-.. image:: https://readthedocs.org/projects/winsign/badge/?version=latest
-        :target: https://winsign.readthedocs.io/en/latest/?badge=latest
-        :alt: Documentation Status
-
 .. image:: https://pyup.io/repos/github/mozilla-releng/winsign/shield.svg
      :target: https://pyup.io/repos/github/mozilla-releng/winsign/
      :alt: Updates
