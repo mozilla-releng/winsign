@@ -248,8 +248,6 @@ def sign_file(
         ci["content"] = sig
         newsig = der_encode(ci)
 
-    open("newsig.der", "wb").write(newsig)
-
     try:
         log.debug("Attaching new signature")
         write_signature(infile, outfile, newsig)
