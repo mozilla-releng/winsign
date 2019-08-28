@@ -224,6 +224,7 @@ def sign_file(
         log.debug("Re-signing with real keys")
         old_sig = get_signeddata(old_sig)
         if crosscert:
+            crosscert = Path(crosscert)
             certs.extend(load_pem_certs(crosscert.read_bytes()))
         newsig = resign(old_sig, certs, signer)
     except Exception:
