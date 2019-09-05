@@ -38,6 +38,7 @@ setup(
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
     ],
     description="Utilities to support code signing Windows executable files",
     install_requires=requirements,
@@ -53,7 +54,7 @@ setup(
     test_suite="tests",
     tests_require=test_requirements,
     url="https://github.com/catlee/winsign",
-    version="1.0.0",
+    version="1.1.0",
     zip_safe=False,
     entry_points={"console_scripts": ["winsign = winsign.sign:main"]},
 )

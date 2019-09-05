@@ -6,7 +6,7 @@ from common import DATA_DIR, EXPECTED_SIGNATURES, TEST_MSI_FILES, TEST_PE_FILES
 from winsign.asn1 import get_signatures_from_certificates, id_timestampSignature
 from winsign.crypto import load_pem_certs, load_private_key, sign_signer_digest
 from winsign.pefile import is_pefile, pefile
-from winsign.sign import sign_file
+from winsign.sign import is_signed, sign_file
 
 
 def have_osslsigncode():
@@ -209,3 +209,16 @@ def test_timestamp_rfc3161(test_file, tmp_path, signing_keys, httpserver):
                     len(sigs[0]["signerInfos"][0]["unauthenticatedAttributes"])
                 )
             )
+
+
+@pytest.mark.parametrize(
+    "test_file, file_is_signed",
+    (
+        ("unsigned.exe", False),
+        ("signed.exe", True),
+        ("unsigned.msi", False),
+        ("cert.pem", False),
+    ),
+)
+def test_is_signed(test_file, file_is_signed):
+    assert is_signed(DATA_DIR / test_file) == file_is_signed

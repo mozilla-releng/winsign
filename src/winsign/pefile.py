@@ -86,7 +86,18 @@ pefile = Struct(
 
 def is_pefile(filename):
     try:
-        pefile.parse_stream(filename.open("rb"))
+        pefile.parse_stream(open(filename, "rb"))
         return True
     except ConstructError:
         return False
+
+
+def is_signed(filename):
+    try:
+        pe = pefile.parse_stream(open(filename, "rb"))
+    except ConstructError:
+        return False
+
+    if not pe.certificates:
+        return False
+    return len(pe.certificates) > 0

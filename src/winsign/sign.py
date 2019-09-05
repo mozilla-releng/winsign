@@ -146,6 +146,15 @@ def extract_signature(infile, sigfile):
     osslsigncode(cmd)
 
 
+def is_signed(filename):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        try:
+            extract_signature(filename, os.path.join(tmpdir, "sig.out"))
+            return True
+        except OSError:
+            return False
+
+
 def get_dummy_signature(infile, digest_algo, url=None, comment=None, crosscert=None):
     with tmpdir() as d:
         cert_file = d / "cert.pem"
