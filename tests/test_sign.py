@@ -220,5 +220,8 @@ def test_timestamp_rfc3161(test_file, tmp_path, signing_keys, httpserver):
         ("cert.pem", False),
     ),
 )
-def test_is_signed(test_file, file_is_signed):
+def test_is_signed(test_file, file_is_signed, caplog):
     assert is_signed(DATA_DIR / test_file) == file_is_signed
+
+    if not file_is_signed:
+        assert "osslsigncode failed" not in caplog.text
