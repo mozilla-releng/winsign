@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+"""Timestamp functions for windows signing."""
 import base64
 import hashlib
 
@@ -17,10 +17,14 @@ from winsign.asn1 import ASN_DIGEST_ALGO_MAP, id_counterSignature, id_timestampS
 
 
 class TSAPolicyId(univ.ObjectIdentifier):
+    """TSA Policy Id."""
+
     pass
 
 
 class TimeStampReq(univ.Sequence):
+    """RFC3161 Timestamp Request."""
+
     componentType = namedtype.NamedTypes(
         namedtype.NamedType("version", univ.Integer(1)),
         namedtype.NamedType("messageImprint", DigestInfo()),
@@ -37,6 +41,8 @@ class TimeStampReq(univ.Sequence):
 
 
 class TimeStampResp(univ.Sequence):
+    """RFC3161 Timestamp Response."""
+
     componentType = namedtype.NamedTypes(
         namedtype.NamedType("status", PKIStatusInfo()),
         namedtype.OptionalNamedType("timeStampToken", univ.Any()),
@@ -45,6 +51,8 @@ class TimeStampResp(univ.Sequence):
 
 # For old style timestamps
 class OldTimeStampReqBlob(univ.Sequence):
+    """Old style Timestamp request blob."""
+
     componentType = namedtype.NamedTypes(
         namedtype.NamedType("type", univ.ObjectIdentifier()),
         namedtype.OptionalNamedType(
@@ -57,6 +65,8 @@ class OldTimeStampReqBlob(univ.Sequence):
 
 
 class OldTimeStampReq(univ.Sequence):
+    """Old style Timestamp request."""
+
     componentType = namedtype.NamedTypes(
         namedtype.NamedType("type", univ.ObjectIdentifier()),
         namedtype.NamedType("blob", OldTimeStampReqBlob()),
@@ -64,6 +74,19 @@ class OldTimeStampReq(univ.Sequence):
 
 
 def get_rfc3161_timestamp(digest_algo, message, timestamp_url=None):
+    """Retrieve an RFC3161 timestamp countersignature.
+
+    Args:
+        digest_algo (str): digest algorithm to use. e.g. 'sha1' or 'sha256'
+        message (str): the message to get a counter signature for. This is
+                       usally the encryptedDigest of our file's signerInfo section.
+        timestamp_url (str): what service to use to fetch the timestamp countersignature from.
+                             defaults to 'http://timestamp.digicert.com'.
+
+    Returns:
+        DER encoded timestamp token
+
+    """
     asn_digest_algo = ASN_DIGEST_ALGO_MAP[digest_algo]
     req = TimeStampReq()
     req["messageImprint"]["digestAlgorithm"] = asn_digest_algo
@@ -85,6 +108,18 @@ def get_rfc3161_timestamp(digest_algo, message, timestamp_url=None):
 
 
 def get_old_timestamp(signature, timestamp_url=None):
+    """Retrieve an old style timestamp countersignature.
+
+    Args:
+        signature (str): the signature to get a counter signature for. This is
+                         usally the encryptedDigest of our file's signerInfo section.
+        timestamp_url (str): what service to use to fetch the timestamp countersignature from.
+                             defaults to 'http://timestamp.digicert.com'.
+
+    Returns:
+        SignedData object
+
+    """
     req = OldTimeStampReq()
     req["type"] = univ.ObjectIdentifier("1.3.6.1.4.1.311.3.2.1")
     req["blob"]["signature"] = signature
@@ -106,8 +141,7 @@ def get_old_timestamp(signature, timestamp_url=None):
 
 
 def add_rfc3161_timestamp(sig, digest_algo, timestamp_url=None):
-    """
-    Adds an RFC3161 timestamp to a SignedData signature
+    """Adds an RFC3161 timestamp to a SignedData signature.
 
     Arguments:
         sig (SignedData): signature to add timestamp
@@ -117,6 +151,7 @@ def add_rfc3161_timestamp(sig, digest_algo, timestamp_url=None):
 
     Returns:
         sig with the timestamp added
+
     """
     signature = sig["signerInfos"][0]["encryptedDigest"].asOctets()
     ts = get_rfc3161_timestamp(digest_algo, signature, timestamp_url)
@@ -129,8 +164,7 @@ def add_rfc3161_timestamp(sig, digest_algo, timestamp_url=None):
 
 
 def add_old_timestamp(sig, timestamp_url=None):
-    """
-    Adds an old style timestamp to a SignedData signature
+    """Adds an old style timestamp to a SignedData signature.
 
     Arguments:
         sig (SignedData): signature to add timestamp
@@ -139,6 +173,7 @@ def add_old_timestamp(sig, timestamp_url=None):
 
     Returns:
         sig with the timestamp added
+
     """
     signature = sig["signerInfos"][0]["encryptedDigest"].asOctets()
     ts = get_old_timestamp(signature, timestamp_url)

@@ -1,6 +1,4 @@
-"""
-Code to verify signatures
-"""
+"""Code to verify signatures."""
 import hashlib
 from binascii import hexlify
 
@@ -30,24 +28,40 @@ from winsign.pefile import calc_authenticode_digest, calc_checksum, pefile
 
 
 class VerifyStatus:
+    """Object to represent signature verification status."""
+
     def __init__(self):
+        """Create a new VerifyStatus object."""
         self.result = True
         self.results = []
 
     def __bool__(self):
+        """Evaluate this object as a boolean.
+
+        Evaluates as True if all checks have passed
+        Evaluates as False if one or more checks have failed.
+
+        """
         return self.result
 
     def __repr__(self):
+        """Return a string representation of the verification status."""
         failing_results = [r for r in self.results if not r[1]]
         return f"<VerifyStatus {self.result}: {failing_results}>"
 
     def add_result(self, name, value, message):
+        """Add a new result to the verificatoin status."""
         self.results.append((name, value, message))
         if not value:
             self.result = False
 
 
 def strip_pkcs1_padding(b):
+    """Removes PKCS1 padding from a byte string.
+
+    e.g. 00 01 FF FF FF FF 00 12 34 -> 12 34
+
+    """
     # Remove leading 00 01 FF .. .. FF 00 from a byte string
     if not b.startswith(b"\x00\x01\xff"):
         raise ValueError("wrong padding")
@@ -62,6 +76,7 @@ def strip_pkcs1_padding(b):
 
 
 def verify_signer_info(signer_info, x509_certs_by_serial):
+    """Verifies a SignerInfo object from a signature."""
     # Convert into the type of SignerInfo (RFC2315) we support
     signer_info = der_decode(der_encode(signer_info), SignerInfo())[0]
 
@@ -104,6 +119,7 @@ def verify_signer_info(signer_info, x509_certs_by_serial):
 
 
 def verify_pefile_checksum(f, pe):
+    """Verifies the PE file checksum."""
     cur_checksum = pe.optional_header.checksum
     new_checksum = calc_checksum(f, pe.optional_header.checksum_offset)
     if cur_checksum == new_checksum:
@@ -113,6 +129,7 @@ def verify_pefile_checksum(f, pe):
 
 
 def asn1_name_to_cryptography_name(asn1_name):
+    """Convert an ASN1 name to a x509 name."""
     attributes = []
     for rdn in asn1_name:
         oid = x509.ObjectIdentifier(str(rdn[0]["type"]))
@@ -122,7 +139,7 @@ def asn1_name_to_cryptography_name(asn1_name):
 
 
 def get_x509_certificates(pe):
-    "Returns a mapping of (issuer, serial) to x509 certificates."
+    """Returns a mapping of (issuer, serial) to x509 certificates."""
     certificates = pe.certificates
     x509_certs_by_serial = {}
     for pe_cert in certificates:
@@ -137,6 +154,7 @@ def get_x509_certificates(pe):
 
 
 def get_attribute(attributes, type_):
+    """Return the first attribute with the given type from a sequence of attributes."""
     for a in attributes:
         if a["type"] == type_:
             return a["values"]
@@ -218,6 +236,7 @@ def verify_pefile_digest(f, pe):
 
 
 def verify_signed_data(signed_data, x509_certs_by_serial):
+    """Verify a SignedData object."""
     # TODO: Handle v1, v3 separately
     # TODO: Use this function everywhere applicable
     passed = True
@@ -309,11 +328,13 @@ def verify_pefile_old_timestamp(f, pe):
                         "sha1", info["encryptedDigest"].asOctets()
                     ).digest()
                     counter_sig = der_decode(a["values"][0], SignerInfo())[0]
+                    counter_sig_digest = der_decode(
+                        get_attribute(
+                            counter_sig["authenticatedAttributes"], id_messageDigest
+                        )[0]
+                    )[0].asOctets()
                     # Check that the counter signature is of the right data
-                    if (
-                        get_message_digest(counter_sig["authenticatedAttributes"])
-                        != signature_digest
-                    ):
+                    if counter_sig_digest != signature_digest:
                         passed = False
                         messages.append(
                             f"counter signature is over the wrong data (hash: {hexlify(signature_digest)})"
@@ -338,6 +359,7 @@ def verify_pefile(f):
         A VerifyStatus object, which evaluates to True if all checks pass, or
         False if one or more checks fail. A list of checks and their statuses
         can be found in the .results attribute.
+
     """
     retval = VerifyStatus()
     f.seek(0)
@@ -351,9 +373,3 @@ def verify_pefile(f):
     retval.add_result("timestamp", *verify_pefile_old_timestamp(f, pe))
 
     return retval
-
-
-def get_message_digest(attrs):
-    for a in attrs:
-        if a["type"] == id_messageDigest:
-            return der_decode(a["values"][0])[0].asOctets()

@@ -1,3 +1,4 @@
+"""Tests specific to signing functionality."""
 import subprocess
 from functools import wraps
 from pathlib import Path
@@ -18,6 +19,12 @@ from winsign.verify import verify_pefile
 
 
 def use_fixed_signing_time(f):
+    """Decorator that injects a hardcoded signing time into signatures.
+
+    Args:
+        f (func): function to wrap
+
+    """
     orig_resign = winsign.asn1.resign
 
     def wrapped_resign(old_sig, certs, signer):
@@ -37,6 +44,7 @@ def use_fixed_signing_time(f):
 
 
 def have_osslsigncode():
+    """Check if osslsigncode is executable."""
     try:
         subprocess.run(["osslsigncode", "--version"])
         return True
@@ -44,6 +52,8 @@ def have_osslsigncode():
         return False
 
 
+# Skip testing this module if we don't have osslsigncode.
+# None of the signing functions will work
 if not have_osslsigncode():
     pytest.skip(
         "skipping tests that require osslsigncode to run", allow_module_level=True
@@ -51,6 +61,18 @@ if not have_osslsigncode():
 
 
 def osslsigncode_verify(filename, substr=b""):
+    """Run osslsigncode verify on the file.
+
+    Args:
+        filename (str): path on disk to verify
+        substr (bytes): substring to look for in the output
+
+    Returns:
+        False is MISMATCH!!! is found in the output, or if substr is specified
+        and not found in the output.
+        True otherwise
+
+    """
     proc = subprocess.run(
         ["osslsigncode", "verify", filename],
         stdout=subprocess.PIPE,
@@ -66,9 +88,7 @@ def osslsigncode_verify(filename, substr=b""):
 @pytest.mark.parametrize("test_file", TEST_PE_FILES + TEST_MSI_FILES)
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
 def test_sign_file(test_file, digest_algo, tmp_path, signing_keys):
-    """
-    Check that we can sign with the osslsign wrapper
-    """
+    """Check that we can sign with the osslsign wrapper."""
     signed_exe = tmp_path / "signed.exe"
 
     priv_key = load_private_key(open(signing_keys[0], "rb").read())
@@ -93,9 +113,9 @@ def test_sign_file(test_file, digest_algo, tmp_path, signing_keys):
 
 
 def test_sign_file_dummy(tmp_path, signing_keys):
-    """
-    Check that we can sign with an additional dummy certificate for use by the
-    stub installer
+    """Check that we can sign with an additional dummy certificate.
+
+    The extra dummy certs are used by the stub installer.
     """
     test_file = DATA_DIR / "unsigned.exe"
     signed_exe = tmp_path / "signed.exe"
@@ -120,9 +140,7 @@ def test_sign_file_dummy(tmp_path, signing_keys):
 
 
 def test_sign_file_twocerts(tmp_path, signing_keys):
-    """
-    Check that we can include multiple certificates
-    """
+    """Check that we can include multiple certificates."""
     test_file = DATA_DIR / "unsigned.exe"
     signed_exe = tmp_path / "signed.exe"
 
@@ -144,9 +162,7 @@ def test_sign_file_twocerts(tmp_path, signing_keys):
 
 
 def test_sign_file_badfile(tmp_path, signing_keys):
-    """
-    Verify that we can't sign non-exe files
-    """
+    """Verify that we can't sign non-exe files."""
     test_file = Path(__file__)
     signed_file = tmp_path / "signed.py"
 
@@ -163,9 +179,7 @@ def test_sign_file_badfile(tmp_path, signing_keys):
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
 @use_fixed_signing_time
 def test_timestamp_old(test_file, digest_algo, tmp_path, signing_keys, httpserver):
-    """
-    Verify that we can sign with old style timestamps
-    """
+    """Verify that we can sign with old style timestamps."""
     signed_exe = tmp_path / "signed.exe"
 
     priv_key = load_private_key(open(signing_keys[0], "rb").read())
@@ -205,9 +219,7 @@ def test_timestamp_old(test_file, digest_algo, tmp_path, signing_keys, httpserve
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
 @use_fixed_signing_time
 def test_timestamp_rfc3161(test_file, digest_algo, tmp_path, signing_keys, httpserver):
-    """
-    Verify that we can sign with RFC3161 timestamps
-    """
+    """Verify that we can sign with RFC3161 timestamps."""
     signed_exe = tmp_path / "signed.exe"
 
     priv_key = load_private_key(open(signing_keys[0], "rb").read())
@@ -263,6 +275,7 @@ def test_timestamp_rfc3161(test_file, digest_algo, tmp_path, signing_keys, https
     ),
 )
 def test_is_signed(test_file, file_is_signed, caplog):
+    """Test that we can properly determine if files are signed or not."""
     assert is_signed(DATA_DIR / test_file) == file_is_signed
 
     if not file_is_signed:
@@ -270,5 +283,6 @@ def test_is_signed(test_file, file_is_signed, caplog):
 
 
 def test_verify_signed_file():
+    """Test that our internal verification code works."""
     with (DATA_DIR / "signed.exe").open("rb") as f:
         assert verify_pefile(f)

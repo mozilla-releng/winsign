@@ -1,0 +1,11 @@
+black
+check-manifest
+cython
+flake8
+flake8-bugbear
+flake8-builtins
+flake8-comprehensions
+flake8-logging-format
+flake8-docstrings
+isort
+pip-compile-multi
