@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import base64
 import logging
 import os
 import shutil
@@ -11,9 +10,7 @@ from binascii import hexlify
 from contextlib import contextmanager
 from pathlib import Path
 
-import requests
 import winsign.timestamp
-from requests_hawk import HawkAuth
 from winsign.asn1 import (
     ContentInfo,
     SignedData,
@@ -293,32 +290,9 @@ def build_parser():
         help="certificates to include in the signature",
         required=True,
     )
-    parser.add_argument("--key", dest="priv_key", help="private key used to sign")
     parser.add_argument(
-        "--autograph-url",
-        dest="autograph_url",
-        help="url for autograph authentication. defaults to $AUTOGRAPH_URL",
-        default=os.environ.get("AUTOGRAPH_URL"),
+        "--key", dest="priv_key", help="private key used to sign", required=True
     )
-    parser.add_argument(
-        "--autograph-user",
-        dest="autograph_user",
-        help="user for autograph authentication. defaults to $AUTOGRAPH_USER",
-        default=os.environ.get("AUTOGRAPH_USER"),
-    )
-    parser.add_argument(
-        "--autograph-secret",
-        dest="autograph_secret",
-        help="secret for autograph authentication. defaults to $AUTOGRAPH_SECRET",
-        default=os.environ.get("AUTOGRAPH_SECRET"),
-    )
-    parser.add_argument(
-        "--autograph-keyid",
-        dest="autograph_keyid",
-        help="keyid for autograph. defaults to $AUTOGRAPH_KEYID",
-        default=os.environ.get("AUTOGRAPH_KEYID"),
-    )
-
     parser.add_argument("-n", dest="comment", help="comment to include in signature")
     parser.add_argument("-i", dest="url", help="url to include in signature")
     parser.add_argument(
@@ -370,36 +344,15 @@ def main(argv=None):
     certs = []
     certs_data = open(args.certs, "rb").read()
     certs = load_pem_certs(certs_data)
-    if args.priv_key:
-        priv_key = load_private_key(open(args.priv_key, "rb").read())
+    priv_key = load_private_key(open(args.priv_key, "rb").read())
 
-        def signer(digest, digest_algo):
-            log.debug(
-                "signing %s with %s",
-                hexlify(digest),
-                priv_key.public_key().public_numbers(),
-            )
-            return sign_signer_digest(priv_key, digest_algo, digest)
-
-    else:
-        # Sign with autograph
-        auth = HawkAuth(id=args.autograph_user, key=args.autograph_secret)
-        url = f"{args.autograph_url}/sign/hash"
-
-        def signer(digest, digest_algo):
-            log.debug(f"signing with autograph at {url}")
-            request_json = {"input": base64.b64encode(digest).decode("ascii")}
-            if args.autograph_keyid:
-                request_json["keyid"] = args.autograph_keyid
-
-            with requests.Session() as session:
-                r = session.post(url, json=[request_json], auth=auth)
-                log.debug(
-                    "Autograph response: %s",
-                    r.text[:120] if len(r.text) >= 120 else r.text,
-                )
-                r.raise_for_status()
-                return base64.b64decode(r.json()[0]["signature"])
+    def signer(digest, digest_algo):
+        log.debug(
+            "signing %s with %s",
+            hexlify(digest),
+            priv_key.public_key().public_numbers(),
+        )
+        return sign_signer_digest(priv_key, digest_algo, digest)
 
     with tmpdir() as d:
         if args.infile == "-":

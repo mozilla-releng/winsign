@@ -5,6 +5,8 @@
 # https://docs.google.com/document/d/1TJf22nAqtIJPB1ybTnoTdgZiFq2oi-LHgrSuwBqOC2g/edit#
 # https://github.com/theuni/osslsigncode/blob/9fb9e1503ca3f49bcfd7535fdd587f2988438706/osslsigncode.c
 # https://www.cs.auckland.ac.nz/~pgut001/pubs/authenticode.txt
+import hashlib
+
 from construct import (
     Array,
     Bytes,
@@ -101,3 +103,75 @@ def is_signed(filename):
     if not pe.certificates:
         return False
     return len(pe.certificates) > 0
+
+
+def calc_authenticode_digest(f, alg="sha256"):
+    h = hashlib.new(alg)
+    f.seek(0)
+    pe = pefile.parse_stream(f)
+
+    f.seek(0, 2)
+    eof = f.tell()
+    f.seek(0)
+
+    # Read up until the checksum
+    to_read = pe.optional_header.checksum_offset
+    h.update(f.read(to_read))
+    # Skip 4 bytes of the checksum
+    f.read(4)
+
+    # If we have a certificate table entry, skip over it
+    if pe.optional_header.certtable_info:
+        t = f.tell()
+        to_read = pe.optional_header.certtable_info - t
+        h.update(f.read(to_read))
+        # Skip over the 8 bytes of the certificate table entry (offset and size)
+        f.read(8)
+
+    # Read the rest of the file, until the certificates
+    if pe.optional_header.certtable_offset:
+        to_read = pe.optional_header.certtable_offset - f.tell()
+        padlen = 8 - (pe.optional_header.certtable_offset % 8)
+    else:
+        to_read = eof - f.tell()
+        padlen = 8 - (eof % 8)
+    h.update(f.read(to_read))
+
+    # Pad the end of the file, before the certificates to 8 bytes
+    if padlen > 0 and padlen < 8:
+        h.update(b"\x00" * padlen)
+
+    return h.digest()
+
+
+def calc_checksum(f, checksum_offset):
+    checksum = 0
+    size = 0
+    f.seek(0)
+
+    while True:
+        data = f.read(1024 ** 2)
+        if not data:
+            break
+        if len(data) % 2 == 1:
+            data = bytearray(data[:-1])
+        else:
+            data = bytearray(data)
+        for i in range(0, len(data), 2):
+            if size == checksum_offset or size == checksum_offset + 2:
+                val = 0
+            else:
+                val = (data[i + 1] << 8) | data[i + 0]
+            checksum += val
+            checksum = 0xFFFF & (checksum + (checksum >> 0x10))
+            size += 2
+
+    checksum = 0xFFFF & (checksum + (checksum >> 0x10))
+    checksum += size
+    checksum &= 0xFFFFFFFFFF
+    return checksum
+
+
+def get_certificates(f):
+    pe = pefile.parse_stream(f)
+    return pe.certificates

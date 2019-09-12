@@ -18,11 +18,13 @@ from pyasn1_modules.rfc2315 import (
 
 log = logging.getLogger(__name__)
 
+id_counterSignature = univ.ObjectIdentifier("1.2.840.113549.1.9.6")
+id_messageDigest = univ.ObjectIdentifier("1.2.840.113549.1.9.4")
 id_sha1 = univ.ObjectIdentifier("1.3.14.3.2.26")
 id_sha256 = univ.ObjectIdentifier("2.16.840.1.101.3.4.2.1")
 id_signedData = univ.ObjectIdentifier("1.2.840.113549.1.7.2")
+id_signingTime = univ.ObjectIdentifier("1.2.840.113549.1.9.5")
 id_timestampSignature = univ.ObjectIdentifier("1.3.6.1.4.1.311.3.3.1")
-id_counterSignature = univ.ObjectIdentifier("1.2.840.113549.1.9.6")
 
 
 algo_sha1 = (
@@ -229,3 +231,48 @@ def resign(old_sig, certs, signer):
     sig = der_encode(ci)
 
     return sig
+
+
+def der_header_length(encoded):
+    """
+    Returns the length of the header of a DER encoded object.
+
+    Arguments:
+        encoded (bytes): DER encoded bytestring
+
+    Returns:
+        length (int)
+    """
+    hlen = 1
+    i = 0
+    tag = encoded[i]
+    # If the tag isn't universal, it may take more than one byte
+    if tag & 0b11000000 != 0 and tag & 0b11111 == 0b11111:
+        hlen += 1
+        i += 1
+        while encoded[i] & 0b10000000:
+            hlen += 1
+            i += 1
+
+    length = encoded[i]
+    hlen += 1
+    if length & 0b10000000:
+        hlen += int(length & 0b01111111)
+
+    return hlen
+
+
+def calc_spc_digest(encoded_content, digest_algo):
+    hlen = der_header_length(encoded_content)
+    digest = hashlib.new(digest_algo, encoded_content[hlen:]).digest()
+    return digest
+
+
+def make_spc(digest_algo, authenticode_digest):
+    spc = SpcIndirectDataContent()
+    spc["data"]["type"] = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.15")
+    spc["data"]["value"]["flags"] = ""
+    spc["data"]["value"]["file"]["file"]["unicode"] = "<<<Obsolete>>>"
+    spc["messageDigest"]["digestAlgorithm"] = ASN_DIGEST_ALGO_MAP[digest_algo]
+    spc["messageDigest"]["digest"] = authenticode_digest
+    return spc

@@ -3,4 +3,4 @@ pyasn1_modules
 cryptography
 construct
 requests
-requests_hawk
+rsa
