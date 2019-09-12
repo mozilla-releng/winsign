@@ -46,7 +46,7 @@ class TimeStampResp(univ.Sequence):
 # For old style timestamps
 class OldTimeStampReqBlob(univ.Sequence):
     componentType = namedtype.NamedTypes(
-        namedtype.NamedType("type", univ.ObjectIdentifier("1.2.840.113549.1.7.1")),
+        namedtype.NamedType("type", univ.ObjectIdentifier()),
         namedtype.OptionalNamedType(
             "signature",
             univ.OctetString().subtype(
@@ -58,7 +58,7 @@ class OldTimeStampReqBlob(univ.Sequence):
 
 class OldTimeStampReq(univ.Sequence):
     componentType = namedtype.NamedTypes(
-        namedtype.NamedType("type", univ.ObjectIdentifier("1.3.6.1.4.1.311.3.2.1")),
+        namedtype.NamedType("type", univ.ObjectIdentifier()),
         namedtype.NamedType("blob", OldTimeStampReqBlob()),
     )
 
@@ -75,6 +75,8 @@ def get_rfc3161_timestamp(digest_algo, message, timestamp_url=None):
     resp = requests.post(
         url, data=encoded_req, headers={"Content-Type": "application/timestamp-query"}
     )
+    # Uncomment below to capture a real response
+    # open('new-ts.dat', 'wb').write(resp.content)
     ts, _ = der_decode(resp.content, TimeStampResp())
     if ts["status"]["status"] != 0:
         raise IOError("Failed to get timestamp: {}".format(ts["status"]))
@@ -84,7 +86,10 @@ def get_rfc3161_timestamp(digest_algo, message, timestamp_url=None):
 
 def get_old_timestamp(signature, timestamp_url=None):
     req = OldTimeStampReq()
+    req["type"] = univ.ObjectIdentifier("1.3.6.1.4.1.311.3.2.1")
     req["blob"]["signature"] = signature
+    req["blob"]["type"] = univ.ObjectIdentifier("1.2.840.113549.1.7.1")
+
     encoded_req = der_encode(req)
     b64_req = base64.b64encode(encoded_req)
 
@@ -93,6 +98,8 @@ def get_old_timestamp(signature, timestamp_url=None):
     resp = requests.post(
         url, data=b64_req, headers={"Content-Type": "application/octet-stream"}
     )
+    # Uncomment below to capture a real response
+    # open('old-ts.dat', 'wb').write(resp.content)
     ci, _ = der_decode(base64.b64decode(resp.content), ContentInfo())
     ts, _ = der_decode(ci["content"], SignedData())
     return ts
@@ -111,7 +118,7 @@ def add_rfc3161_timestamp(sig, digest_algo, timestamp_url=None):
     Returns:
         sig with the timestamp added
     """
-    signature = der_encode(sig["signerInfos"][0]["encryptedDigest"])
+    signature = sig["signerInfos"][0]["encryptedDigest"].asOctets()
     ts = get_rfc3161_timestamp(digest_algo, signature, timestamp_url)
     i = len(sig["signerInfos"][0]["unauthenticatedAttributes"])
     sig["signerInfos"][0]["unauthenticatedAttributes"][i][
@@ -133,7 +140,7 @@ def add_old_timestamp(sig, timestamp_url=None):
     Returns:
         sig with the timestamp added
     """
-    signature = der_encode(sig["signerInfos"][0]["encryptedDigest"])
+    signature = sig["signerInfos"][0]["encryptedDigest"].asOctets()
     ts = get_old_timestamp(signature, timestamp_url)
     # Use SequenceOf here to force the order to what we want
     # Assuming this should be in the order of the validity
