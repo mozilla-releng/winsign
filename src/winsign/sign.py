@@ -89,16 +89,17 @@ def tmpdir():
         shutil.rmtree(d)
 
 
-def osslsigncode(args):
+def osslsigncode(args, log_errors=True):
     cmd = ["osslsigncode"] + list(args)
     log.debug("running: %s", cmd)
     p = subprocess.run(
         cmd, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, encoding="utf8"
     )
     if p.returncode != 0:
-        log.error("osslsigncode failed when running %s:", args[0])
-        for line in p.stdout.split("\n"):
-            log.error(line)
+        if log_errors:
+            log.error("osslsigncode failed when running %s:", args[0])
+            for line in p.stdout.split("\n"):
+                log.error(line)
         raise OSError("osslsigncode failed")
 
 
@@ -149,7 +150,14 @@ def extract_signature(infile, sigfile):
 def is_signed(filename):
     with tempfile.TemporaryDirectory() as tmpdir:
         try:
-            extract_signature(filename, os.path.join(tmpdir, "sig.out"))
+            cmd = [
+                "extract-signature",
+                "-in",
+                filename,
+                "-out",
+                os.path.join(tmpdir, "sig.out"),
+            ]
+            osslsigncode(cmd, log_errors=False)
             return True
         except OSError:
             return False
