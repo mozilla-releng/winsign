@@ -29,6 +29,8 @@ from construct import (
     this,
 )
 
+from winsign.asn1 import make_authenticode_signeddata, der_encode
+
 dos_stub = Struct("magic" / Const(b"MZ"), "pe_offset" / Pointer(0x3C, Int16ul))
 
 coff_header = Struct(
@@ -237,6 +239,7 @@ def get_certificates(f):
 def add_signature(ifile, ofile, signature):
     """Add a signature to a PE file."""
     # First copy ifile to ofile
+    ifile.seek(0)
     ofile.write(ifile.read())
 
     ofile.seek(0)
@@ -283,3 +286,26 @@ def add_signature(ifile, ofile, signature):
     checksum = calc_checksum(ofile, pe.optional_header.checksum_offset)
     ofile.seek(pe.optional_header.checksum_offset)
     ofile.write(Int32ul.build(checksum))
+
+
+def sign_file(
+    ifile,
+    ofile,
+    certs,
+    signer,
+    digest_algo,
+    timestamp=None,
+    opus_info=None,
+    opus_url=None,
+):
+    authenticode_digest = calc_authenticode_digest(ifile, digest_algo)
+
+    sig = make_authenticode_signeddata(
+        certs, signer, authenticode_digest, digest_algo, timestamp, opus_info, opus_url
+    )
+
+    sig = der_encode(sig)
+
+    add_signature(ifile, ofile, sig)
+
+    return True

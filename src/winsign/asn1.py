@@ -1,8 +1,8 @@
 """ASN.1 structures and methods specific for windows signing."""
-import datetime
 import hashlib
 import logging
 from binascii import hexlify
+from datetime import datetime
 
 from pyasn1.codec.der.decoder import decode as der_decode
 from pyasn1.codec.der.encoder import encode as der_encode
@@ -416,7 +416,7 @@ def make_authenticode_signeddata(
     )
 
     signer_digest = calc_signerinfo_digest(signer_info, digest_algo)
-    signer_info["encryptedDigest"] = signer(digest_algo, signer_digest)
+    signer_info["encryptedDigest"] = signer(signer_digest, digest_algo)
 
     sig = SignedData()
     sig["version"] = 1
