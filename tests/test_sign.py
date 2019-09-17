@@ -14,7 +14,8 @@ from winsign.asn1 import (
 )
 from winsign.crypto import load_pem_certs, load_private_key, sign_signer_digest
 from winsign.pefile import get_certificates, is_pefile
-from winsign.sign import is_signed, sign_file
+from winsign.osslsigncode import is_signed
+from winsign.sign import sign_file
 from winsign.verify import verify_pefile
 
 
