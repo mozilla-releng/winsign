@@ -10,3 +10,5 @@ dist/
 .python-version
 *.so
 *.o
+
+docs/_build/

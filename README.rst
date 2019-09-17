@@ -5,19 +5,29 @@ winsign
 .. image:: https://img.shields.io/pypi/v/winsign.svg
         :target: https://pypi.python.org/pypi/winsign
 
-Utilities to support code signing Windows executable files.
+.. image:: https://readthedocs.org/projects/winsign/badge/?version=latest
+        :target: https://winsign.readthedocs.io/en/latest/?badge=latest
+        :alt: Documentation Status
+
+`winsign` is a python module for signing and manipulating `Authenticode
+<https://en.wikipedia.org/wiki/Code_signing#Implementations>`_ signatures in PE and MSI files.
 
 * Works on Python 3.6 and up.
 * Free software: MPL2
-* Requires osslsigncode to operate from e.g. https://github.com/theuni/osslsigncode
 
+Requirements
+============
+Most dependencies are specified in requirements/base.txt, however, currently
+you also need `osslsigncode` installed to perform signing. This utility can be
+fetched from your distribution's package repository, or from e.g.
+https://github.com/theuni/osslsigncode
 
 Installation
-------------
+============
 `pip install winsign`
 
 CLI Usage
----------
+=========
 ::
 
    usage: winsign [-h] --certs CERTS --key PRIV_KEY [-n COMMENT] [-i URL] -d
@@ -39,7 +49,13 @@ CLI Usage
      -v, --verbose
      -q, --quiet
 
+Future plans
+============
+* Stop using osslsigncode for PE signatures
+* Refactor code so that osslsigncode functionality is in its own module
+* Add python support for MSI, then we can drop dependency on osslsigncode
+
 Credits
--------
+=======
 
 * Chris AtLee <catlee@mozilla.com>

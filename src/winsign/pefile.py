@@ -1,10 +1,14 @@
-#!/usr/bin/env python
 # Based on https://docs.microsoft.com/en-ca/windows/desktop/Debug/pe-format
 # https://github.com/etingof/pyasn1-modules/blob/master/pyasn1_modules/rfc2315.py
 # https://upload.wikimedia.org/wikipedia/commons/1/1b/Portable_Executable_32_bit_Structure_in_SVG_fixed.svg
 # https://docs.google.com/document/d/1TJf22nAqtIJPB1ybTnoTdgZiFq2oi-LHgrSuwBqOC2g/edit#
 # https://github.com/theuni/osslsigncode/blob/9fb9e1503ca3f49bcfd7535fdd587f2988438706/osslsigncode.c
 # https://www.cs.auckland.ac.nz/~pgut001/pubs/authenticode.txt
+"""PE file format support.
+
+This module provides various structures and methods that represent Windows PE files,
+with a specific focus on the parts of the format required for signing.
+"""
 import hashlib
 
 from construct import (
@@ -87,6 +91,16 @@ pefile = Struct(
 
 
 def is_pefile(filename):
+    """Determine if a file is a PE file or not.
+
+    Args:
+        filename (str): path to file to check
+
+    Returns:
+        True if the file appears to be a PE file
+        False otherwise
+
+    """
     try:
         pefile.parse_stream(open(filename, "rb"))
         return True
@@ -95,6 +109,19 @@ def is_pefile(filename):
 
 
 def is_signed(filename):
+    """Determine if a PE file is signed or not.
+
+    This does not verify the signatures, it merely returns whether a file
+    contains signatures or not.
+
+    Args:
+        filename (str): path to file to check
+
+    Returns:
+        True if the file has signatures
+        False otherwise
+
+    """
     try:
         pe = pefile.parse_stream(open(filename, "rb"))
     except ConstructError:
@@ -105,7 +132,18 @@ def is_signed(filename):
     return len(pe.certificates) > 0
 
 
+# TODO: This is slow in Python
 def calc_authenticode_digest(f, alg="sha256"):
+    """Calculate the authenticode digest for file.
+
+    Args:
+        f (file object): opened PE file
+        alg (str): digest algorithm to use. Defaults to sha256.
+
+    Returns:
+        The authenicode digest as a byte string
+
+    """
     h = hashlib.new(alg)
     f.seek(0)
     pe = pefile.parse_stream(f)
@@ -145,6 +183,16 @@ def calc_authenticode_digest(f, alg="sha256"):
 
 
 def calc_checksum(f, checksum_offset):
+    """Calculate the PE file checksum.
+
+    Args:
+        f (file object): PE file opened for reading
+        checksum_offset (int): where in the PE file the checksum is located
+
+    Returns:
+        integer checksum
+
+    """
     checksum = 0
     size = 0
     f.seek(0)
@@ -173,5 +221,14 @@ def calc_checksum(f, checksum_offset):
 
 
 def get_certificates(f):
+    """Return the set of certificates in the PE file.
+
+    Args:
+        f (file object): PE file opened for reading
+
+    Returns:
+        List of `certificate` objects, or None if there are none
+
+    """
     pe = pefile.parse_stream(f)
     return pe.certificates

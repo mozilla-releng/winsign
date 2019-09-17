@@ -25,3 +25,10 @@ recursive-include tests *.py
 
 include .isort.cfg
 exclude .taskcluster.yml
+
+# added by check_manifest.py
+recursive-include docs *.bat
+recursive-include docs Makefile
+
+# added by check_manifest.py
+include *.yml
