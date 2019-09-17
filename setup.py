@@ -49,5 +49,5 @@ setup(
     url="https://github.com/catlee/winsign",
     version="1.3.0",
     zip_safe=False,
-    entry_points={"console_scripts": ["winsign = winsign.sign:main"]},
+    entry_points={"console_scripts": ["winsign = winsign.cli:main"]},
 )
