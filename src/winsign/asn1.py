@@ -1,11 +1,12 @@
 """ASN.1 structures and methods specific for windows signing."""
+import datetime
 import hashlib
 import logging
 from binascii import hexlify
 
 from pyasn1.codec.der.decoder import decode as der_decode
 from pyasn1.codec.der.encoder import encode as der_encode
-from pyasn1.type import char, namedtype, namedval, tag, univ
+from pyasn1.type import char, namedtype, namedval, tag, univ, useful
 from pyasn1_modules.rfc2315 import (
     Attribute,
     Certificate,
@@ -19,6 +20,12 @@ from pyasn1_modules.rfc2315 import (
 
 log = logging.getLogger(__name__)
 
+id_rsaEncryption = univ.ObjectIdentifier("1.2.840.113549.1.1.1")
+id_contentType = univ.ObjectIdentifier("1.2.840.113549.1.9.3")
+id_spcIndirectDataContext = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.4")
+id_spcStatementType = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.11")
+id_individualCodeSigning = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.21")
+id_spcSpOpusInfo = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.12")
 id_counterSignature = univ.ObjectIdentifier("1.2.840.113549.1.9.6")
 id_messageDigest = univ.ObjectIdentifier("1.2.840.113549.1.9.4")
 id_sha1 = univ.ObjectIdentifier("1.3.14.3.2.26")
@@ -326,3 +333,101 @@ def make_spc(digest_algo, authenticode_digest):
     spc["messageDigest"]["digestAlgorithm"] = ASN_DIGEST_ALGO_MAP[digest_algo]
     spc["messageDigest"]["digest"] = authenticode_digest
     return spc
+
+
+def make_signer_info(
+    pkcs7_cert, digest_algo, timestamp, spc_digest, opus_info=None, opus_url=None
+):
+    """Create a SignerInfo object representing an Authenticode signature."""
+    signer_info = SignerInfo()
+    signer_info["version"] = 1
+    signer_info["issuerAndSerialNumber"]["issuer"] = pkcs7_cert["tbsCertificate"][
+        "issuer"
+    ]
+    signer_info["issuerAndSerialNumber"]["serialNumber"] = pkcs7_cert["tbsCertificate"][
+        "serialNumber"
+    ]
+    signer_info["digestAlgorithm"] = ASN_DIGEST_ALGO_MAP[digest_algo]
+    signer_info["digestEncryptionAlgorithm"]["algorithm"] = id_rsaEncryption
+    signer_info["digestEncryptionAlgorithm"]["parameters"] = univ.Null("")
+    signer_info["authenticatedAttributes"][0]["type"] = id_contentType
+    signer_info["authenticatedAttributes"][0]["values"][0] = id_spcIndirectDataContext
+    signer_info["authenticatedAttributes"][1]["type"] = id_signingTime
+    signer_info["authenticatedAttributes"][1]["values"][0] = timestamp
+    signer_info["authenticatedAttributes"][2]["type"] = id_spcStatementType
+    signer_info["authenticatedAttributes"][2]["values"][0] = univ.Sequence()
+    signer_info["authenticatedAttributes"][2]["values"][0][0] = id_individualCodeSigning
+    i = 3
+    if opus_info or opus_url:
+        opus = SpcSpOpusInfo()
+        if opus_info:
+            opus["programName"]["ascii"] = opus_info
+        if opus_url:
+            opus["moreInfo"]["url"] = opus_url
+        signer_info["authenticatedAttributes"][3]["type"] = id_spcSpOpusInfo
+        signer_info["authenticatedAttributes"][3]["values"][0] = opus
+        i = 4
+
+    signer_info["authenticatedAttributes"][i]["type"] = id_messageDigest
+    signer_info["authenticatedAttributes"][i]["values"][0] = univ.OctetString(
+        spc_digest
+    )
+    return signer_info
+
+
+def make_authenticode_signeddata(
+    cert,
+    signer,
+    authenticode_digest,
+    digest_algo,
+    timestamp=None,
+    opus_info=None,
+    opus_url=None,
+):
+    """Creates a SignedData object containing the signature for a PE file.
+
+    Arguments:
+        cert (X509):        public certificate used for signing
+        signer (function):  signing function
+        authenticode_digest (bytes): Authenticode digest of PE file to sign
+                                     NB. This is not simply the hash of the file!
+        digest_algo (str): digest algorithm to use. e.g. 'sha256'
+        timestamp (UTCTime): optional. timestamp to include in the signature.
+                             If not provided, the current time is used.
+        opus_info (string):  Additional information to include in the signature
+        opus_url (string):   URL to include in the signature
+    Returns:
+        A ContentInfo ASN1 object
+
+    """
+    if not timestamp:
+        timestamp = useful.UTCTime.fromDateTime(datetime.now())
+
+    asn_digest_algo = ASN_DIGEST_ALGO_MAP[digest_algo]
+
+    spc = make_spc(digest_algo, authenticode_digest)
+
+    encoded_spc = der_encode(spc)
+
+    pkcs7_cert = x509_to_pkcs7(cert)
+
+    signer_info = make_signer_info(
+        pkcs7_cert, digest_algo, timestamp, calc_spc_digest(encoded_spc, digest_algo)
+    )
+
+    signer_digest = calc_signerinfo_digest(signer_info, digest_algo)
+    signer_info["encryptedDigest"] = signer(digest_algo, signer_digest)
+
+    sig = SignedData()
+    sig["version"] = 1
+    sig["digestAlgorithms"][0] = asn_digest_algo
+    sig["certificates"][0]["certificate"] = pkcs7_cert
+    sig["contentInfo"]["contentType"] = id_spcIndirectDataContext
+    sig["contentInfo"]["content"] = encoded_spc
+    sig["signerInfos"][0] = signer_info
+
+    ci = ContentInfo()
+    ci["contentType"] = id_signedData
+    ci["content"] = sig
+
+    return ci

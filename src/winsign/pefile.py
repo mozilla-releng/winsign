@@ -232,3 +232,54 @@ def get_certificates(f):
     """
     pe = pefile.parse_stream(f)
     return pe.certificates
+
+
+def add_signature(ifile, ofile, signature):
+    """Add a signature to a PE file."""
+    # First copy ifile to ofile
+    ofile.write(ifile.read())
+
+    ofile.seek(0)
+    pe = pefile.parse_stream(ofile)
+    if not pe.optional_header.certtable_info:
+        raise ValueError(
+            "Can't add a signature into this file (not enough RVA sections)"
+        )
+
+    cert = certificate.build(
+        {
+            "size": len(signature) + 8,
+            "revision": "REV2",
+            "certtype": "PKCS7",
+            "data": signature,
+        }
+    )
+
+    # If we already have signatures, then add the new one to the end of the file
+    if pe.optional_header.certtable_offset:
+        certs_offset = pe.optional_header.certtable_offset
+        certs_size = pe.optional_header.certtable_size + len(cert)
+        old_certs_size = pe.optional_header.certtable_size
+    else:
+        # Figure out the end of the file
+        ofile.seek(0, 2)
+        certs_offset = ofile.tell()
+        # Pad to 8 byte boundary
+        if certs_offset % 8:
+            certs_offset += 8 - (certs_offset % 8)
+        certs_size = len(cert)
+        old_certs_size = 0
+
+    # Update the certificate table info
+    ofile.seek(pe.optional_header.certtable_info)
+    ofile.write(Int32ul.build(certs_offset))
+    ofile.write(Int32ul.build(certs_size))
+
+    # Add the signature
+    ofile.seek(certs_offset + old_certs_size)
+    ofile.write(cert)
+
+    # Update the checksum
+    checksum = calc_checksum(ofile, pe.optional_header.checksum_offset)
+    ofile.seek(pe.optional_header.checksum_offset)
+    ofile.write(Int32ul.build(checksum))

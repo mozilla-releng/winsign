@@ -1,3 +1,2 @@
-* Move CLI to own module
 * Move osslsigncode to own module
 * Do PE signing with pure python code
