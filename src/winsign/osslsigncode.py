@@ -1,11 +1,11 @@
 """Functions for using osslsigncode utility for signing."""
 import logging
-import subprocess
 import os
+import subprocess
 import tempfile
 from pathlib import Path
 
-from winsign.pefile import is_pefile, certificate
+from winsign.pefile import certificate, is_pefile
 
 log = logging.getLogger(__name__)
 

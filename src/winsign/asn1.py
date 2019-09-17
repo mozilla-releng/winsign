@@ -20,18 +20,18 @@ from pyasn1_modules.rfc2315 import (
 
 log = logging.getLogger(__name__)
 
-id_rsaEncryption = univ.ObjectIdentifier("1.2.840.113549.1.1.1")
 id_contentType = univ.ObjectIdentifier("1.2.840.113549.1.9.3")
-id_spcIndirectDataContext = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.4")
-id_spcStatementType = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.11")
-id_individualCodeSigning = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.21")
-id_spcSpOpusInfo = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.12")
 id_counterSignature = univ.ObjectIdentifier("1.2.840.113549.1.9.6")
+id_individualCodeSigning = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.21")
 id_messageDigest = univ.ObjectIdentifier("1.2.840.113549.1.9.4")
+id_rsaEncryption = univ.ObjectIdentifier("1.2.840.113549.1.1.1")
 id_sha1 = univ.ObjectIdentifier("1.3.14.3.2.26")
 id_sha256 = univ.ObjectIdentifier("2.16.840.1.101.3.4.2.1")
 id_signedData = univ.ObjectIdentifier("1.2.840.113549.1.7.2")
 id_signingTime = univ.ObjectIdentifier("1.2.840.113549.1.9.5")
+id_spcIndirectDataContext = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.4")
+id_spcSpOpusInfo = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.12")
+id_spcStatementType = univ.ObjectIdentifier("1.3.6.1.4.1.311.2.1.11")
 id_timestampSignature = univ.ObjectIdentifier("1.3.6.1.4.1.311.3.3.1")
 
 

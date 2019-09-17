@@ -13,8 +13,8 @@ from winsign.asn1 import (
     id_timestampSignature,
 )
 from winsign.crypto import load_pem_certs, load_private_key, sign_signer_digest
-from winsign.pefile import get_certificates, is_pefile
 from winsign.osslsigncode import is_signed
+from winsign.pefile import get_certificates, is_pefile
 from winsign.sign import sign_file
 from winsign.verify import verify_pefile
 
