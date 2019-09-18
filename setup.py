@@ -6,7 +6,7 @@
 from glob import glob
 from os.path import basename, splitext
 
-from setuptools import find_packages, setup, Extension
+from setuptools import Extension, find_packages, setup
 
 with open("README.rst") as readme_file:
     readme = readme_file.read()

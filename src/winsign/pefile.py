@@ -28,8 +28,7 @@ from construct import (
     Tell,
     this,
 )
-
-from winsign.asn1 import make_authenticode_signeddata, der_encode
+from winsign.asn1 import der_encode, make_authenticode_signeddata
 
 dos_stub = Struct("magic" / Const(b"MZ"), "pe_offset" / Pointer(0x3C, Int16ul))
 
@@ -190,6 +189,7 @@ def _checksum_update_slow(data, checksum):
         checksum = 0xFFFF & (checksum + (checksum >> 0x10))
     return checksum
 
+
 try:
     from winsign._fast import _checksum_update_fast as _checksum_update
 except ImportError:
@@ -327,6 +327,7 @@ def sign_file(
     timestamp_url=None,
     authenticode_timestamp=None,
 ):
+    """Sign a PE file."""
     authenticode_digest = calc_authenticode_digest(infile, digest_algo)
 
     # TODO: Support crosscert
