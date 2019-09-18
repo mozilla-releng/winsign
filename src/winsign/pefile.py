@@ -134,7 +134,6 @@ def is_signed(filename):
     return len(pe.certificates) > 0
 
 
-# TODO: This is slow in Python
 def calc_authenticode_digest(f, alg="sha256"):
     """Calculate the authenticode digest for file.
 
@@ -191,6 +190,11 @@ def _checksum_update_slow(data, checksum):
         checksum = 0xFFFF & (checksum + (checksum >> 0x10))
     return checksum
 
+try:
+    from winsign._fast import _checksum_update_fast as _checksum_update
+except ImportError:
+    _checksum_update = _checksum_update_slow
+
 
 def calc_checksum(f, checksum_offset):
     """Calculate the PE file checksum.
@@ -220,7 +224,7 @@ def calc_checksum(f, checksum_offset):
         if not data:
             break
         size += len(data)
-        checksum = _checksum_update_slow(data, checksum)
+        checksum = _checksum_update(data, checksum)
 
     # Read the 4 bytes of the checksum.
     f.read(4)
@@ -236,7 +240,7 @@ def calc_checksum(f, checksum_offset):
         if not data:
             break
         size += len(data)
-        checksum = _checksum_update_slow(data, checksum)
+        checksum = _checksum_update(data, checksum)
 
     checksum = 0xFFFF & (checksum + (checksum >> 0x10))
     checksum += size

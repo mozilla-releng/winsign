@@ -6,7 +6,7 @@
 from glob import glob
 from os.path import basename, splitext
 
-from setuptools import find_packages, setup
+from setuptools import find_packages, setup, Extension
 
 with open("README.rst") as readme_file:
     readme = readme_file.read()
@@ -16,7 +16,7 @@ with open("HISTORY.rst") as history_file:
 
 requirements = ["construct", "cryptography", "pyasn1", "pyasn1_modules"]
 
-setup_requirements = ["pytest-runner"]
+setup_requirements = ["pytest-runner", "cython"]
 
 test_requirements = ["pytest"]
 
@@ -50,4 +50,5 @@ setup(
     version="1.3.0",
     zip_safe=False,
     entry_points={"console_scripts": ["winsign = winsign.cli:main"]},
+    ext_modules=[Extension("winsign._fast", sources=["src/winsign/_fast.pyx"])],
 )
