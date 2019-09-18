@@ -184,12 +184,22 @@ def calc_authenticode_digest(f, alg="sha256"):
     return h.digest()
 
 
+def _checksum_update_slow(data, checksum):
+    for i in range(0, len(data), 2):
+        val = (data[i + 1] << 8) | data[i + 0]
+        checksum += val
+        checksum = 0xFFFF & (checksum + (checksum >> 0x10))
+    return checksum
+
+
 def calc_checksum(f, checksum_offset):
     """Calculate the PE file checksum.
 
     Args:
         f (file object): PE file opened for reading
-        checksum_offset (int): where in the PE file the checksum is located
+        checksum_offset (int): where in the PE file the checksum is located. 4
+            bytes at this location are skipped for the purposes of calculating
+            the checksum
 
     Returns:
         integer checksum
@@ -199,22 +209,34 @@ def calc_checksum(f, checksum_offset):
     size = 0
     f.seek(0)
 
+    # Read data prior to the checksum offset
     while True:
-        data = f.read(1024 ** 2)
-        if not data:
+        toread = min(checksum_offset - size, 1024 ** 2)
+        if toread <= 0:
             break
+        data = bytearray(f.read(toread))
         if len(data) % 2 == 1:
             data = bytearray(data[:-1])
-        else:
-            data = bytearray(data)
-        for i in range(0, len(data), 2):
-            if size == checksum_offset or size == checksum_offset + 2:
-                val = 0
-            else:
-                val = (data[i + 1] << 8) | data[i + 0]
-            checksum += val
-            checksum = 0xFFFF & (checksum + (checksum >> 0x10))
-            size += 2
+        if not data:
+            break
+        size += len(data)
+        checksum = _checksum_update_slow(data, checksum)
+
+    # Read the 4 bytes of the checksum.
+    f.read(4)
+    checksum = 0xFFFF & (checksum + (checksum >> 0x10))
+    checksum = 0xFFFF & (checksum + (checksum >> 0x10))
+    size += 4
+
+    # Read the rest of the data
+    while True:
+        data = bytearray(f.read(1024 ** 2))
+        if len(data) % 2 == 1:
+            data = bytearray(data[:-1])
+        if not data:
+            break
+        size += len(data)
+        checksum = _checksum_update_slow(data, checksum)
 
     checksum = 0xFFFF & (checksum + (checksum >> 0x10))
     checksum += size
