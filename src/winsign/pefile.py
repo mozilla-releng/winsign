@@ -236,14 +236,14 @@ def get_certificates(f):
     return pe.certificates
 
 
-def add_signature(ifile, ofile, signature):
+def add_signature(infile, outfile, signature):
     """Add a signature to a PE file."""
-    # First copy ifile to ofile
-    ifile.seek(0)
-    ofile.write(ifile.read())
+    # First copy infile to outfile
+    infile.seek(0)
+    outfile.write(infile.read())
 
-    ofile.seek(0)
-    pe = pefile.parse_stream(ofile)
+    outfile.seek(0)
+    pe = pefile.parse_stream(outfile)
     if not pe.optional_header.certtable_info:
         raise ValueError(
             "Can't add a signature into this file (not enough RVA sections)"
@@ -265,8 +265,8 @@ def add_signature(ifile, ofile, signature):
         old_certs_size = pe.optional_header.certtable_size
     else:
         # Figure out the end of the file
-        ofile.seek(0, 2)
-        certs_offset = ofile.tell()
+        outfile.seek(0, 2)
+        certs_offset = outfile.tell()
         # Pad to 8 byte boundary
         if certs_offset % 8:
             certs_offset += 8 - (certs_offset % 8)
@@ -274,38 +274,50 @@ def add_signature(ifile, ofile, signature):
         old_certs_size = 0
 
     # Update the certificate table info
-    ofile.seek(pe.optional_header.certtable_info)
-    ofile.write(Int32ul.build(certs_offset))
-    ofile.write(Int32ul.build(certs_size))
+    outfile.seek(pe.optional_header.certtable_info)
+    outfile.write(Int32ul.build(certs_offset))
+    outfile.write(Int32ul.build(certs_size))
 
     # Add the signature
-    ofile.seek(certs_offset + old_certs_size)
-    ofile.write(cert)
+    outfile.seek(certs_offset + old_certs_size)
+    outfile.write(cert)
 
     # Update the checksum
-    checksum = calc_checksum(ofile, pe.optional_header.checksum_offset)
-    ofile.seek(pe.optional_header.checksum_offset)
-    ofile.write(Int32ul.build(checksum))
+    checksum = calc_checksum(outfile, pe.optional_header.checksum_offset)
+    outfile.seek(pe.optional_header.checksum_offset)
+    outfile.write(Int32ul.build(checksum))
 
 
 def sign_file(
-    ifile,
-    ofile,
+    infile,
+    outfile,
+    digest_algo,
     certs,
     signer,
-    digest_algo,
-    timestamp=None,
-    opus_info=None,
-    opus_url=None,
+    url=None,
+    comment=None,
+    crosscert=None,
+    timestamp_style=None,
+    timestamp_url=None,
+    authenticode_timestamp=None,
 ):
-    authenticode_digest = calc_authenticode_digest(ifile, digest_algo)
+    authenticode_digest = calc_authenticode_digest(infile, digest_algo)
+
+    # TODO: Support crosscert
+    # TODO: timestamp counter sigs
 
     sig = make_authenticode_signeddata(
-        certs, signer, authenticode_digest, digest_algo, timestamp, opus_info, opus_url
+        certs,
+        signer,
+        authenticode_digest,
+        digest_algo,
+        authenticode_timestamp,
+        comment,
+        url,
     )
 
     sig = der_encode(sig)
 
-    add_signature(ifile, ofile, sig)
+    add_signature(infile, outfile, sig)
 
     return True

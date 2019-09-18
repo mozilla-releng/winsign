@@ -20,7 +20,7 @@ def test_sign(test_file, digest_algo, tmp_path, signing_keys):
     def signer(digest, digest_algo):
         return sign_signer_digest(priv_key, digest_algo, digest)
 
-    with test_file.open('rb') as ifile, signed_exe.open('wb+') as ofile:
-        assert sign_file(ifile, ofile, cert, signer, digest_algo)
+    with test_file.open('rb') as infile, signed_exe.open('wb+') as outfile:
+        assert sign_file(infile, outfile, digest_algo, cert, signer)
 
-        assert verify_pefile(ofile)
+        assert verify_pefile(outfile)
