@@ -376,32 +376,34 @@ def make_signer_info(
 
 
 def make_authenticode_signeddata(
-    cert,
+    certs,
     signer,
     authenticode_digest,
     digest_algo,
-    timestamp=None,
-    opus_info=None,
-    opus_url=None,
+    comment=None,
+    url=None,
+    authenticode_timestamp=None,
 ):
     """Creates a SignedData object containing the signature for a PE file.
 
-    Arguments:
-        cert (X509):        public certificate used for signing
-        signer (function):  signing function
+    Args:
+        certs (X509): public certificates used for signing
+        signer (function): signing function
         authenticode_digest (bytes): Authenticode digest of PE file to sign
                                      NB. This is not simply the hash of the file!
         digest_algo (str): digest algorithm to use. e.g. 'sha256'
-        timestamp (UTCTime): optional. timestamp to include in the signature.
-                             If not provided, the current time is used.
-        opus_info (string):  Additional information to include in the signature
-        opus_url (string):   URL to include in the signature
+        comment (string): Additional information to include in the signature
+        url (string): URL to include in the signature
+        authenticode_timestamp (UTCTime): optional. timestamp to include in the
+                                          signature.  If not provided, the
+                                          current time is used.
+
     Returns:
-        A ContentInfo ASN1 object
+        A SignedData ASN1 object
 
     """
-    if not timestamp:
-        timestamp = useful.UTCTime.fromDateTime(datetime.now())
+    if not authenticode_timestamp:
+        authenticode_timestamp = useful.UTCTime.fromDateTime(datetime.now())
 
     asn_digest_algo = ASN_DIGEST_ALGO_MAP[digest_algo]
 
@@ -409,14 +411,15 @@ def make_authenticode_signeddata(
 
     encoded_spc = der_encode(spc)
 
-    pkcs7_cert = x509_to_pkcs7(cert)
-
+    pkcs7_cert = x509_to_pkcs7(certs[0])
     signer_info = make_signer_info(
-        pkcs7_cert, digest_algo, timestamp, calc_spc_digest(encoded_spc, digest_algo)
+        pkcs7_cert,
+        digest_algo,
+        authenticode_timestamp,
+        calc_spc_digest(encoded_spc, digest_algo),
+        comment,
+        url,
     )
-
-    signer_digest = calc_signerinfo_digest(signer_info, digest_algo)
-    signer_info["encryptedDigest"] = signer(signer_digest, digest_algo)
 
     sig = SignedData()
     sig["version"] = 1
@@ -426,8 +429,6 @@ def make_authenticode_signeddata(
     sig["contentInfo"]["content"] = encoded_spc
     sig["signerInfos"][0] = signer_info
 
-    ci = ContentInfo()
-    ci["contentType"] = id_signedData
-    ci["content"] = sig
+    sig = resign(sig, certs, signer)
 
-    return ci
+    return sig

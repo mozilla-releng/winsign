@@ -4,3 +4,4 @@ pytest
 pytest-cov
 pytest-localserver
 pytest-random-order
+hypothesis

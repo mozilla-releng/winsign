@@ -10,7 +10,9 @@ This module provides various structures and methods that represent Windows PE fi
 with a specific focus on the parts of the format required for signing.
 """
 import hashlib
+from pathlib import Path
 
+import winsign.timestamp
 from construct import (
     Array,
     Bytes,
@@ -28,7 +30,15 @@ from construct import (
     Tell,
     this,
 )
-from winsign.asn1 import der_encode, make_authenticode_signeddata
+from winsign.asn1 import (
+    ContentInfo,
+    SignedData,
+    der_decode,
+    der_encode,
+    id_signedData,
+    make_authenticode_signeddata,
+)
+from winsign.crypto import load_pem_certs
 
 dos_stub = Struct("magic" / Const(b"MZ"), "pe_offset" / Pointer(0x3C, Int16ul))
 
@@ -262,7 +272,7 @@ def get_certificates(f):
     return pe.certificates
 
 
-def add_signature(infile, outfile, signature):
+def add_signature(infile, outfile, signature, replace=True):
     """Add a signature to a PE file."""
     # First copy infile to outfile
     infile.seek(0)
@@ -289,6 +299,10 @@ def add_signature(infile, outfile, signature):
         certs_offset = pe.optional_header.certtable_offset
         certs_size = pe.optional_header.certtable_size + len(cert)
         old_certs_size = pe.optional_header.certtable_size
+
+        if replace:
+            certs_size = len(cert)
+            old_certs_size = 0
     else:
         # Figure out the end of the file
         outfile.seek(0, 2)
@@ -307,6 +321,8 @@ def add_signature(infile, outfile, signature):
     # Add the signature
     outfile.seek(certs_offset + old_certs_size)
     outfile.write(cert)
+    # Truncate the file, we're done with it
+    outfile.truncate()
 
     # Update the checksum
     checksum = calc_checksum(outfile, pe.optional_header.checksum_offset)
@@ -328,23 +344,47 @@ def sign_file(
     authenticode_timestamp=None,
 ):
     """Sign a PE file."""
-    authenticode_digest = calc_authenticode_digest(infile, digest_algo)
+    if not is_pefile(infile):
+        return False
 
-    # TODO: Support crosscert
-    # TODO: timestamp counter sigs
+    if crosscert:
+        crosscert = Path(crosscert)
+        certs = certs + load_pem_certs(crosscert.read_bytes())
+    with Path(infile).open("rb") as ifile, Path(outfile).open("wb+") as ofile:
+        authenticode_digest = calc_authenticode_digest(ifile, digest_algo)
 
-    sig = make_authenticode_signeddata(
-        certs,
-        signer,
-        authenticode_digest,
-        digest_algo,
-        authenticode_timestamp,
-        comment,
-        url,
-    )
+        # TODO: Support multiple certs
+        # TODO: timestamp counter sigs
 
-    sig = der_encode(sig)
+        sig = make_authenticode_signeddata(
+            certs,
+            signer,
+            authenticode_digest,
+            digest_algo,
+            comment,
+            url,
+            authenticode_timestamp,
+        )
 
-    add_signature(infile, outfile, sig)
+        if timestamp_style == "old":
+            ci = der_decode(sig, ContentInfo())[0]
+            sig = der_decode(ci["content"], SignedData())[0]
+            sig = winsign.timestamp.add_old_timestamp(sig, timestamp_url)
+            ci = ContentInfo()
+            ci["contentType"] = id_signedData
+            ci["content"] = sig
+            sig = der_encode(ci)
+        elif timestamp_style == "rfc3161":
+            ci = der_decode(sig, ContentInfo())[0]
+            sig = der_decode(ci["content"], SignedData())[0]
+            sig = winsign.timestamp.add_rfc3161_timestamp(
+                sig, digest_algo, timestamp_url
+            )
+            ci = ContentInfo()
+            ci["contentType"] = id_signedData
+            ci["content"] = sig
+            sig = der_encode(ci)
 
-    return True
+        add_signature(ifile, ofile, sig)
+
+        return True

@@ -5,6 +5,17 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import winsign.timestamp
+from winsign.asn1 import (
+    ContentInfo,
+    SignedData,
+    der_decode,
+    der_encode,
+    get_signeddata,
+    id_signedData,
+    resign,
+)
+from winsign.crypto import load_pem_certs
 from winsign.pefile import certificate, is_pefile
 
 log = logging.getLogger(__name__)
@@ -272,3 +283,92 @@ def write_signature(infile, outfile, sig):
             outfile,
         ]
         osslsigncode(cmd)
+
+
+def sign_file(
+    infile,
+    outfile,
+    digest_algo,
+    certs,
+    signer,
+    url=None,
+    comment=None,
+    crosscert=None,
+    timestamp_style=None,
+    timestamp_url=None,
+):
+    """Sign a PE or MSI file.
+
+    Args:
+        infile (str): Path to the unsigned file
+        outfile (str): Path to where the signed file will be written
+        digest_algo (str): Which digest algorithm to use. Generally 'sha1' or 'sha256'
+        certs (str): Path to where the PEM encoded public certificate(s) are located
+        signer (function): Function that takes (digest, digest_algo) and
+                           returns bytes of the signature. Normally this will
+                           be using a private key object to sign the digest.
+        url (str): A URL to embed into the signature
+        comment (str): A string to embed into the signature
+        crosscert (str): Extra certificates to attach to the signature
+        timestamp_style (str): What kind of signed timestamp to include in the
+                               signature. Can be None, 'old', or 'rfc3161'.
+        timestamp_url (str): URL for the timestamp server to use. Required if
+                             timestamp_style is set.
+
+
+    Returns:
+        True on success
+        False otherwise
+
+    """
+    infile = Path(infile)
+    outfile = Path(outfile)
+    try:
+        log.debug("Generating dummy signature")
+        old_sig = get_dummy_signature(
+            infile, digest_algo, url=url, comment=comment, crosscert=crosscert
+        )
+    except OSError:
+        log.error("Couldn't generate dummy signature")
+        log.debug("Exception:", exc_info=True)
+        return False
+
+    try:
+        log.debug("Re-signing with real keys")
+        old_sig = get_signeddata(old_sig)
+        if crosscert:
+            crosscert = Path(crosscert)
+            certs = certs + load_pem_certs(crosscert.read_bytes())
+        newsig = resign(old_sig, certs, signer)
+    except Exception:
+        log.error("Couldn't re-sign")
+        log.debug("Exception:", exc_info=True)
+        return False
+
+    if timestamp_style == "old":
+        ci = der_decode(newsig, ContentInfo())[0]
+        sig = der_decode(ci["content"], SignedData())[0]
+        sig = winsign.timestamp.add_old_timestamp(sig, timestamp_url)
+        ci = ContentInfo()
+        ci["contentType"] = id_signedData
+        ci["content"] = sig
+        newsig = der_encode(ci)
+    elif timestamp_style == "rfc3161":
+        ci = der_decode(newsig, ContentInfo())[0]
+        sig = der_decode(ci["content"], SignedData())[0]
+        sig = winsign.timestamp.add_rfc3161_timestamp(sig, digest_algo, timestamp_url)
+        ci = ContentInfo()
+        ci["contentType"] = id_signedData
+        ci["content"] = sig
+        newsig = der_encode(ci)
+
+    try:
+        log.debug("Attaching new signature")
+        write_signature(infile, outfile, newsig)
+    except Exception:
+        log.error("Couldn't write new signature")
+        log.debug("Exception:", exc_info=True)
+        return False
+
+    log.debug("Done!")
+    return True
