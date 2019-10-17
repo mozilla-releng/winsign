@@ -1,8 +1,8 @@
 """common paths used by tests."""
+import inspect
 from functools import wraps
 from pathlib import Path
 from unittest import mock
-import inspect
 
 import winsign.asn1
 from winsign.asn1 import id_signingTime
@@ -31,11 +31,14 @@ def use_fixed_signing_time(f):
         return orig_resign(old_sig, certs, signer)
 
     if inspect.iscoroutinefunction(f):
+
         @wraps(f)
         async def wrapper(*args, **kwargs):
             with mock.patch("winsign.sign.resign", wrapped_resign):
                 return await f(*args, **kwargs)
+
     else:
+
         @wraps(f)
         def wrapper(*args, **kwargs):
             with mock.patch("winsign.sign.resign", wrapped_resign):

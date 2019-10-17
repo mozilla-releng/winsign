@@ -152,7 +152,9 @@ async def test_sign_file_badfile(tmp_path, signing_keys):
 @pytest.mark.parametrize("test_file", [DATA_DIR / "unsigned.exe"])
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
 @use_fixed_signing_time
-async def test_timestamp_old(test_file, digest_algo, tmp_path, signing_keys, httpserver):
+async def test_timestamp_old(
+    test_file, digest_algo, tmp_path, signing_keys, httpserver
+):
     """Verify that we can sign with old style timestamps."""
     signed_exe = tmp_path / "signed.exe"
 
@@ -193,7 +195,9 @@ async def test_timestamp_old(test_file, digest_algo, tmp_path, signing_keys, htt
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
 @use_fixed_signing_time
 @pytest.mark.asyncio
-async def test_timestamp_rfc3161(test_file, digest_algo, tmp_path, signing_keys, httpserver):
+async def test_timestamp_rfc3161(
+    test_file, digest_algo, tmp_path, signing_keys, httpserver
+):
     """Verify that we can sign with RFC3161 timestamps."""
     signed_exe = tmp_path / "signed.exe"
 
