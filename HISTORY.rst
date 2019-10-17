@@ -2,7 +2,7 @@
 History
 =======
 
-Unreleaseed version (YYYY-MM-DD)
+2.0.0 version (2019-10-17)
 --------------------------------
 * Breaking API: Some functions are now async. In particular, the top-level
   `sign_file` function is now an async function.

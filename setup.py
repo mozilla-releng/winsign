@@ -47,7 +47,7 @@ setup(
     test_suite="tests",
     tests_require=test_requirements,
     url="https://github.com/catlee/winsign",
-    version="1.3.0",
+    version="2.0.0",
     zip_safe=False,
     entry_points={"console_scripts": ["winsign = winsign.cli:main"]},
 )
