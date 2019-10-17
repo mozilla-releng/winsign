@@ -73,7 +73,7 @@ class OldTimeStampReq(univ.Sequence):
     )
 
 
-def get_rfc3161_timestamp(digest_algo, message, timestamp_url=None):
+async def get_rfc3161_timestamp(digest_algo, message, timestamp_url=None):
     """Retrieve an RFC3161 timestamp countersignature.
 
     Args:
@@ -107,7 +107,7 @@ def get_rfc3161_timestamp(digest_algo, message, timestamp_url=None):
     return der_encode(ts["timeStampToken"])
 
 
-def get_old_timestamp(signature, timestamp_url=None):
+async def get_old_timestamp(signature, timestamp_url=None):
     """Retrieve an old style timestamp countersignature.
 
     Args:
@@ -140,7 +140,7 @@ def get_old_timestamp(signature, timestamp_url=None):
     return ts
 
 
-def add_rfc3161_timestamp(sig, digest_algo, timestamp_url=None):
+async def add_rfc3161_timestamp(sig, digest_algo, timestamp_url=None):
     """Adds an RFC3161 timestamp to a SignedData signature.
 
     Arguments:
@@ -154,7 +154,7 @@ def add_rfc3161_timestamp(sig, digest_algo, timestamp_url=None):
 
     """
     signature = sig["signerInfos"][0]["encryptedDigest"].asOctets()
-    ts = get_rfc3161_timestamp(digest_algo, signature, timestamp_url)
+    ts = await get_rfc3161_timestamp(digest_algo, signature, timestamp_url)
     i = len(sig["signerInfos"][0]["unauthenticatedAttributes"])
     sig["signerInfos"][0]["unauthenticatedAttributes"][i][
         "type"
@@ -163,7 +163,7 @@ def add_rfc3161_timestamp(sig, digest_algo, timestamp_url=None):
     return sig
 
 
-def add_old_timestamp(sig, timestamp_url=None):
+async def add_old_timestamp(sig, timestamp_url=None):
     """Adds an old style timestamp to a SignedData signature.
 
     Arguments:
@@ -176,7 +176,7 @@ def add_old_timestamp(sig, timestamp_url=None):
 
     """
     signature = sig["signerInfos"][0]["encryptedDigest"].asOctets()
-    ts = get_old_timestamp(signature, timestamp_url)
+    ts = await get_old_timestamp(signature, timestamp_url)
     # Use SequenceOf here to force the order to what we want
     # Assuming this should be in the order of the validity
     # TODO: Not sure if this is correct, but seems to work

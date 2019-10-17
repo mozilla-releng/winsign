@@ -241,7 +241,7 @@ def get_signatures_from_certificates(certificates):
     return retval
 
 
-def resign(old_sig, certs, signer):
+async def resign(old_sig, certs, signer):
     """Resigns an old signature with a new certificate.
 
     Replaces the encrypted signature digest in the given signature with new one
@@ -277,7 +277,7 @@ def resign(old_sig, certs, signer):
         digest_algo = "sha256"
     signer_digest = calc_signerinfo_digest(new_si, digest_algo)
     log.debug("Digest to sign is: %s", hexlify(signer_digest))
-    new_si["encryptedDigest"] = signer(signer_digest, digest_algo)
+    new_si["encryptedDigest"] = await signer(signer_digest, digest_algo)
     new_sig["signerInfos"][0] = new_si
 
     ci = ContentInfo()

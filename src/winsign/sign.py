@@ -45,7 +45,7 @@ def key_signer(priv_key):
     return signer
 
 
-def sign_file(
+async def sign_file(
     infile,
     outfile,
     digest_algo,
@@ -99,7 +99,7 @@ def sign_file(
         if crosscert:
             crosscert = Path(crosscert)
             certs.extend(load_pem_certs(crosscert.read_bytes()))
-        newsig = resign(old_sig, certs, signer)
+        newsig = await resign(old_sig, certs, signer)
     except Exception:
         log.error("Couldn't re-sign")
         log.debug("Exception:", exc_info=True)
@@ -108,7 +108,7 @@ def sign_file(
     if timestamp_style == "old":
         ci = der_decode(newsig, ContentInfo())[0]
         sig = der_decode(ci["content"], SignedData())[0]
-        sig = winsign.timestamp.add_old_timestamp(sig, timestamp_url)
+        sig = await winsign.timestamp.add_old_timestamp(sig, timestamp_url)
         ci = ContentInfo()
         ci["contentType"] = id_signedData
         ci["content"] = sig
@@ -116,7 +116,9 @@ def sign_file(
     elif timestamp_style == "rfc3161":
         ci = der_decode(newsig, ContentInfo())[0]
         sig = der_decode(ci["content"], SignedData())[0]
-        sig = winsign.timestamp.add_rfc3161_timestamp(sig, digest_algo, timestamp_url)
+        sig = await winsign.timestamp.add_rfc3161_timestamp(
+            sig, digest_algo, timestamp_url
+        )
         ci = ContentInfo()
         ci["contentType"] = id_signedData
         ci["content"] = sig

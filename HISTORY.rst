@@ -2,6 +2,11 @@
 History
 =======
 
+Unreleaseed version (YYYY-MM-DD)
+--------------------------------
+* Restructured module layout
+* Added docs
+
 1.3.0 (2019-09-12)
 ------------------
 
