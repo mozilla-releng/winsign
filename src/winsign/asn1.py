@@ -375,7 +375,7 @@ def make_signer_info(
     return signer_info
 
 
-def make_authenticode_signeddata(
+async def make_authenticode_signeddata(
     cert,
     signer,
     authenticode_digest,
@@ -416,7 +416,7 @@ def make_authenticode_signeddata(
     )
 
     signer_digest = calc_signerinfo_digest(signer_info, digest_algo)
-    signer_info["encryptedDigest"] = signer(signer_digest, digest_algo)
+    signer_info["encryptedDigest"] = await signer(signer_digest, digest_algo)
 
     sig = SignedData()
     sig["version"] = 1

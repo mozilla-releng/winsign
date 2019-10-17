@@ -9,7 +9,8 @@ from winsign.verify import verify_pefile
 
 @pytest.mark.parametrize("test_file", TEST_PE_FILES)
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
-def test_sign(test_file, digest_algo, tmp_path, signing_keys):
+@pytest.mark.asyncio
+async def test_sign(test_file, digest_algo, tmp_path, signing_keys):
     """Check that we can sign a PE file."""
     signed_exe = tmp_path / "signed.exe"
 
@@ -18,10 +19,10 @@ def test_sign(test_file, digest_algo, tmp_path, signing_keys):
     # TODO: Make sure multiple works
     cert = certs[0]
 
-    def signer(digest, digest_algo):
+    async def signer(digest, digest_algo):
         return sign_signer_digest(priv_key, digest_algo, digest)
 
     with test_file.open("rb") as infile, signed_exe.open("wb+") as outfile:
-        assert sign_file(infile, outfile, digest_algo, cert, signer)
+        assert await sign_file(infile, outfile, digest_algo, cert, signer)
 
         assert verify_pefile(outfile)

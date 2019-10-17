@@ -291,7 +291,7 @@ def add_signature(infile, outfile, signature):
     outfile.write(Int32ul.build(checksum))
 
 
-def sign_file(
+async def sign_file(
     infile,
     outfile,
     digest_algo,
@@ -310,7 +310,7 @@ def sign_file(
     # TODO: Support crosscert
     # TODO: timestamp counter sigs
 
-    sig = make_authenticode_signeddata(
+    sig = await make_authenticode_signeddata(
         certs,
         signer,
         authenticode_digest,

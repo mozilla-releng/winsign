@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """CLI for signing PE and MSI files."""
+import asyncio
 import logging
 import sys
 import tempfile
@@ -63,8 +64,8 @@ def build_parser():
     return parser
 
 
-def main(argv=None):
-    """Main CLI entry point for signing."""
+async def async_main(argv=None):
+    """Main CLI entry point for signing (async)."""
     parser = build_parser()
     args = parser.parse_args(argv)
 
@@ -101,7 +102,7 @@ def main(argv=None):
         else:
             outfile = Path(args.outfile)
 
-        r = sign_file(
+        r = await sign_file(
             args.infile,
             outfile,
             args.digest_algo,
@@ -122,3 +123,9 @@ def main(argv=None):
                 _copy_stream(f, sys.stdout.buffer)
 
         return 0
+
+
+def main(argv=None, loop=None):
+    """Main CLI entry point for signing (sync)."""
+    loop = loop or asyncio.get_event_loop()
+    return loop.run_until_complete(async_main(argv))

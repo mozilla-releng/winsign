@@ -34,7 +34,7 @@ def key_signer(priv_key):
     """
     # noqa:D202
 
-    def signer(digest, digest_algo):
+    async def signer(digest, digest_algo):
         log.debug(
             "signing %s with %s",
             hexlify(digest),
