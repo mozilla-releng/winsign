@@ -4,6 +4,8 @@ History
 
 Unreleaseed version (YYYY-MM-DD)
 --------------------------------
+* Breaking API: Some functions are now async. In particular, the top-level
+  `sign_file` function is now an async function.
 * Restructured module layout
 * Added docs
 

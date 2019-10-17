@@ -2,6 +2,7 @@
 from functools import wraps
 from pathlib import Path
 from unittest import mock
+import inspect
 
 import winsign.asn1
 from winsign.asn1 import id_signingTime
@@ -29,9 +30,15 @@ def use_fixed_signing_time(f):
                     attr["values"][0] = b"\x17\r190912061110Z"
         return orig_resign(old_sig, certs, signer)
 
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        with mock.patch("winsign.sign.resign", wrapped_resign):
-            return f(*args, **kwargs)
+    if inspect.iscoroutinefunction(f):
+        @wraps(f)
+        async def wrapper(*args, **kwargs):
+            with mock.patch("winsign.sign.resign", wrapped_resign):
+                return await f(*args, **kwargs)
+    else:
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            with mock.patch("winsign.sign.resign", wrapped_resign):
+                return f(*args, **kwargs)
 
     return wrapper

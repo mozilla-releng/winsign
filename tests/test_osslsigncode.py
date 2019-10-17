@@ -148,10 +148,10 @@ async def test_sign_file_badfile(tmp_path, signing_keys):
     assert not await sign_file(test_file, signed_file, "sha1", certs, signer)
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("test_file", [DATA_DIR / "unsigned.exe"])
 @pytest.mark.parametrize("digest_algo", ["sha1", "sha256"])
 @use_fixed_signing_time
-@pytest.mark.asyncio
 async def test_timestamp_old(test_file, digest_algo, tmp_path, signing_keys, httpserver):
     """Verify that we can sign with old style timestamps."""
     signed_exe = tmp_path / "signed.exe"
