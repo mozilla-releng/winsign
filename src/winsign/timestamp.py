@@ -2,7 +2,7 @@
 import base64
 import hashlib
 
-import requests
+import aiohttp
 from pyasn1.codec.der.decoder import decode as der_decode
 from pyasn1.codec.der.encoder import encode as der_encode
 from pyasn1.type import namedtype, tag, univ
@@ -73,7 +73,7 @@ class OldTimeStampReq(univ.Sequence):
     )
 
 
-def get_rfc3161_timestamp(digest_algo, message, timestamp_url=None):
+async def get_rfc3161_timestamp(digest_algo, message, timestamp_url=None):
     """Retrieve an RFC3161 timestamp countersignature.
 
     Args:
@@ -95,19 +95,22 @@ def get_rfc3161_timestamp(digest_algo, message, timestamp_url=None):
 
     url = timestamp_url or "http://timestamp.digicert.com"
 
-    resp = requests.post(
-        url, data=encoded_req, headers={"Content-Type": "application/timestamp-query"}
-    )
-    # Uncomment below to capture a real response
-    # open('new-ts.dat', 'wb').write(resp.content)
-    ts, _ = der_decode(resp.content, TimeStampResp())
-    if ts["status"]["status"] != 0:
-        raise IOError("Failed to get timestamp: {}".format(ts["status"]))
+    async with aiohttp.request(
+        "POST",
+        url,
+        data=encoded_req,
+        headers={"Content-Type": "application/timestamp-query"},
+    ) as resp:
+        # Uncomment below to capture a real response
+        # open('new-ts.dat', 'wb').write(resp.content)
+        ts, _ = der_decode(await resp.read(), TimeStampResp())
+        if ts["status"]["status"] != 0:
+            raise IOError("Failed to get timestamp: {}".format(ts["status"]))
 
-    return der_encode(ts["timeStampToken"])
+        return der_encode(ts["timeStampToken"])
 
 
-def get_old_timestamp(signature, timestamp_url=None):
+async def get_old_timestamp(signature, timestamp_url=None):
     """Retrieve an old style timestamp countersignature.
 
     Args:
@@ -130,17 +133,17 @@ def get_old_timestamp(signature, timestamp_url=None):
 
     url = timestamp_url or "http://timestamp.digicert.com"
 
-    resp = requests.post(
-        url, data=b64_req, headers={"Content-Type": "application/octet-stream"}
-    )
-    # Uncomment below to capture a real response
-    # open('old-ts.dat', 'wb').write(resp.content)
-    ci, _ = der_decode(base64.b64decode(resp.content), ContentInfo())
-    ts, _ = der_decode(ci["content"], SignedData())
-    return ts
+    async with aiohttp.request(
+        "POST", url, data=b64_req, headers={"Content-Type": "application/octet-stream"}
+    ) as resp:
+        # Uncomment below to capture a real response
+        # open('old-ts.dat', 'wb').write(resp.content)
+        ci, _ = der_decode(base64.b64decode(await resp.read()), ContentInfo())
+        ts, _ = der_decode(ci["content"], SignedData())
+        return ts
 
 
-def add_rfc3161_timestamp(sig, digest_algo, timestamp_url=None):
+async def add_rfc3161_timestamp(sig, digest_algo, timestamp_url=None):
     """Adds an RFC3161 timestamp to a SignedData signature.
 
     Arguments:
@@ -154,7 +157,7 @@ def add_rfc3161_timestamp(sig, digest_algo, timestamp_url=None):
 
     """
     signature = sig["signerInfos"][0]["encryptedDigest"].asOctets()
-    ts = get_rfc3161_timestamp(digest_algo, signature, timestamp_url)
+    ts = await get_rfc3161_timestamp(digest_algo, signature, timestamp_url)
     i = len(sig["signerInfos"][0]["unauthenticatedAttributes"])
     sig["signerInfos"][0]["unauthenticatedAttributes"][i][
         "type"
@@ -163,7 +166,7 @@ def add_rfc3161_timestamp(sig, digest_algo, timestamp_url=None):
     return sig
 
 
-def add_old_timestamp(sig, timestamp_url=None):
+async def add_old_timestamp(sig, timestamp_url=None):
     """Adds an old style timestamp to a SignedData signature.
 
     Arguments:
@@ -176,7 +179,7 @@ def add_old_timestamp(sig, timestamp_url=None):
 
     """
     signature = sig["signerInfos"][0]["encryptedDigest"].asOctets()
-    ts = get_old_timestamp(signature, timestamp_url)
+    ts = await get_old_timestamp(signature, timestamp_url)
     # Use SequenceOf here to force the order to what we want
     # Assuming this should be in the order of the validity
     # TODO: Not sure if this is correct, but seems to work

@@ -28,6 +28,7 @@ from construct import (
     Tell,
     this,
 )
+from winsign.asn1 import der_encode, make_authenticode_signeddata
 
 dos_stub = Struct("magic" / Const(b"MZ"), "pe_offset" / Pointer(0x3C, Int16ul))
 
@@ -232,3 +233,95 @@ def get_certificates(f):
     """
     pe = pefile.parse_stream(f)
     return pe.certificates
+
+
+def add_signature(infile, outfile, signature):
+    """Add a signature to a PE file."""
+    # First copy infile to outfile
+    infile.seek(0)
+    while True:
+        block = infile.read(1024)
+        if not block:
+            break
+        outfile.write(block)
+
+    outfile.seek(0)
+    pe = pefile.parse_stream(outfile)
+    if not pe.optional_header.certtable_info:
+        raise ValueError(
+            "Can't add a signature into this file (not enough RVA sections)"
+        )
+
+    cert = certificate.build(
+        {
+            "size": len(signature) + 8,
+            "revision": "REV2",
+            "certtype": "PKCS7",
+            "data": signature,
+        }
+    )
+
+    # If we already have signatures, then add the new one to the end of the file
+    if pe.optional_header.certtable_offset:
+        certs_offset = pe.optional_header.certtable_offset
+        certs_size = pe.optional_header.certtable_size + len(cert)
+        old_certs_size = pe.optional_header.certtable_size
+    else:
+        # Figure out the end of the file
+        outfile.seek(0, 2)
+        certs_offset = outfile.tell()
+        # Pad to 8 byte boundary
+        if certs_offset % 8:
+            certs_offset += 8 - (certs_offset % 8)
+        certs_size = len(cert)
+        old_certs_size = 0
+
+    # Update the certificate table info
+    outfile.seek(pe.optional_header.certtable_info)
+    outfile.write(Int32ul.build(certs_offset))
+    outfile.write(Int32ul.build(certs_size))
+
+    # Add the signature
+    outfile.seek(certs_offset + old_certs_size)
+    outfile.write(cert)
+
+    # Update the checksum
+    checksum = calc_checksum(outfile, pe.optional_header.checksum_offset)
+    outfile.seek(pe.optional_header.checksum_offset)
+    outfile.write(Int32ul.build(checksum))
+
+
+async def sign_file(
+    infile,
+    outfile,
+    digest_algo,
+    certs,
+    signer,
+    url=None,
+    comment=None,
+    crosscert=None,
+    timestamp_style=None,
+    timestamp_url=None,
+    authenticode_timestamp=None,
+):
+    """Sign a file."""
+    authenticode_digest = calc_authenticode_digest(infile, digest_algo)
+
+    # TODO: Support crosscert
+    # TODO: timestamp counter sigs
+
+    sig = await make_authenticode_signeddata(
+        certs,
+        signer,
+        authenticode_digest,
+        digest_algo,
+        authenticode_timestamp,
+        comment,
+        url,
+    )
+
+    sig = der_encode(sig)
+
+    add_signature(infile, outfile, sig)
+
+    return True

@@ -1,3 +1,2 @@
-* Signature verification for old style timestamps
-* CLI
-* MSI files
+* Move osslsigncode to own module
+* Do PE signing with pure python code
