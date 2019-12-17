@@ -3,32 +3,24 @@ include HISTORY.rst
 include LICENSE
 include README.rst
 include CODE_OF_CONDUCT.md
+include pyproject.toml
+include setup.py
 include tox.ini
 include TODO
 include Dockerfile
 
-recursive-include requirements *.in
-recursive-include requirements *.txt
-recursive-include tests *
+recursive-include src *
+
+exclude .dirschema.yml
+exclude .readthedocs.yml
+exclude .taskcluster.yml
+exclude Dockerfile.test
+exclude docs
+exclude requirements
+exclude tests
+
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
-
-
-recursive-include src *.py
-
-recursive-include docs *.rst conf.py
-
-recursive-include tests *.msi
-recursive-include tests *.dll
-recursive-include tests *.exe
-recursive-include tests *.py
-
-include .isort.cfg
-exclude .taskcluster.yml
-
-# added by check_manifest.py
-recursive-include docs *.bat
-recursive-include docs Makefile
-
-# added by check_manifest.py
-include *.yml
+recursive-exclude docs *
+recursive-exclude requirements *
+recursive-exclude tests *
