@@ -14,7 +14,14 @@ with open("README.rst") as readme_file:
 with open("HISTORY.rst") as history_file:
     history = history_file.read()
 
-requirements = ["construct", "cryptography", "pyasn1", "pyasn1_modules"]
+requirements = [
+    "aiohttp",
+    "construct",
+    "cryptography",
+    "pyasn1",
+    "pyasn1_modules",
+    "rsa",
+]
 
 setup_requirements = ["pytest-runner"]
 
@@ -46,7 +53,7 @@ setup(
     setup_requires=setup_requirements,
     test_suite="tests",
     tests_require=test_requirements,
-    url="https://github.com/catlee/winsign",
+    url="https://github.com/mozilla-releng/winsign",
     version="2.0.0",
     zip_safe=False,
     entry_points={"console_scripts": ["winsign = winsign.cli:main"]},
