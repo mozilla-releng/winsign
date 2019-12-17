@@ -1,5 +1,11 @@
 -r base.in
 
+black
+check-manifest
+coverage==4.5.4
+flake8
+isort
+pip-compile-multi
 pytest
 pytest-asyncio
 pytest-cov
