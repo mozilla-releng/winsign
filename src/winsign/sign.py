@@ -16,6 +16,7 @@ from winsign.asn1 import (
 )
 from winsign.crypto import load_pem_certs, sign_signer_digest
 from winsign.osslsigncode import get_dummy_signature, write_signature
+import winsign.makemsix
 
 log = logging.getLogger(__name__)
 
@@ -83,11 +84,17 @@ async def sign_file(
     """
     infile = Path(infile)
     outfile = Path(outfile)
+
+    is_msix = winsign.makemsix.is_msixfile(infile)
+
     try:
         log.debug("Generating dummy signature")
-        old_sig = get_dummy_signature(
-            infile, digest_algo, url=url, comment=comment, crosscert=crosscert
-        )
+        if is_msix:
+            old_sig = winsign.makemsix.dummy_sign(infile, outfile)
+        else:
+            old_sig = get_dummy_signature(
+                infile, digest_algo, url=url, comment=comment, crosscert=crosscert
+            )
     except OSError:
         log.error("Couldn't generate dummy signature")
         log.debug("Exception:", exc_info=True)
@@ -126,7 +133,10 @@ async def sign_file(
 
     try:
         log.debug("Attaching new signature")
-        write_signature(infile, outfile, newsig)
+        if is_msix:
+            winsign.makemsix.attach_signature(outfile, outfile, newsig)
+        else:
+            write_signature(infile, outfile, newsig)
     except Exception:
         log.error("Couldn't write new signature")
         log.debug("Exception:", exc_info=True)
