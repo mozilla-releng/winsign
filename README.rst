@@ -22,7 +22,8 @@ you also need `osslsigncode` installed to perform signing. This utility can be
 fetched from your distribution's package repository, or from e.g.
 https://github.com/theuni/osslsigncode
 
-Signing MSIX/APPX files currently requires Mozilla's fork of `msix-packaging`<https://github.com/mozilla/msix-packaging/tree/johnmcpms/signing>`_.
+Signing MSIX/APPX files currently requires Mozilla's fork of `msix-packaging
+<https://github.com/mozilla/msix-packaging/tree/johnmcpms/signing>`_.
 
 Installation
 ============

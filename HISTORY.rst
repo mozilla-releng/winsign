@@ -2,6 +2,7 @@ History
 =======
 
 2.1.0 (2021-07-14)
+------------------
 * Added support for MSIX/APPX signing
 
 2.0.0 (2019-10-17)
