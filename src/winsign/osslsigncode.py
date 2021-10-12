@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 from winsign.pefile import certificate, is_pefile
+from winsign.crypto import write_pem_cert
 
 log = logging.getLogger(__name__)
 
@@ -238,13 +239,14 @@ def get_dummy_signature(infile, digest_algo, url=None, comment=None, crosscert=N
             return sig.read_bytes()
 
 
-def write_signature(infile, outfile, sig):
+def write_signature(infile, outfile, sig, certs):
     """Writes a signature into a file.
 
     Args:
         infile (str): Path to the unsigned file
         outfile (str): Path to write the signature into
         sig (str): bytes of signature to add into the file
+        certs (list of x509 certificates): certificates to attach to the new signature
 
     Returns:
         Same as `winsign.sign.osslsigncode`_
@@ -259,16 +261,28 @@ def write_signature(infile, outfile, sig):
         )
     else:
         cert = sig
-    with tempfile.NamedTemporaryFile() as sigfile:
-        sigfile.write(cert)
-        sigfile.flush()
+
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        sigfile = d / "sigfile"
+        with open(sigfile, "wb") as sf:
+            sf.write(cert)
+
+        cert_file = d / "cert.pem"
+        # TODO: this hack of assuming the last cert is bound to break
+        #       this passes tests and integration for now.
+        write_pem_cert(certs[-1], cert_file)
+
         cmd = [
             "attach-signature",
             "-sigin",
-            sigfile.name,
+            sigfile,
+            "-CAfile",
+            cert_file,
             "-in",
             infile,
             "-out",
             outfile,
         ]
+
         osslsigncode(cmd)

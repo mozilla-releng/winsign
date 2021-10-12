@@ -4,6 +4,7 @@ import logging
 from binascii import hexlify
 from pathlib import Path
 
+import winsign.makemsix
 import winsign.timestamp
 from winsign.asn1 import (
     ContentInfo,
@@ -16,7 +17,6 @@ from winsign.asn1 import (
 )
 from winsign.crypto import load_pem_certs, sign_signer_digest
 from winsign.osslsigncode import get_dummy_signature, write_signature
-import winsign.makemsix
 
 log = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ async def sign_file(
         infile (str): Path to the unsigned file
         outfile (str): Path to where the signed file will be written
         digest_algo (str): Which digest algorithm to use. Generally 'sha1' or 'sha256'
-        certs (str): Path to where the PEM encoded public certificate(s) are located
+        certs (list of x509 certificates): certificates to attach to the new signature
         signer (function): Function that takes (digest, digest_algo) and
                            returns bytes of the signature. Normally this will
                            be using a private key object to sign the digest.
@@ -136,10 +136,10 @@ async def sign_file(
         if is_msix:
             winsign.makemsix.attach_signature(outfile, outfile, newsig)
         else:
-            write_signature(infile, outfile, newsig)
+            write_signature(infile, outfile, newsig, certs)
     except Exception:
         log.error("Couldn't write new signature")
-        log.debug("Exception:", exc_info=True)
+        log.error("Exception:", exc_info=True)
         return False
 
     log.debug("Done!")

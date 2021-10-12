@@ -95,11 +95,7 @@ def makemsix(args, log_errors=True):
         raise OSError("makemsix failed")
 
 
-def run_sign_command(
-    infile,
-    outfile,
-    pfxfile,
-):
+def run_sign_command(infile, outfile, pfxfile):
     """Sign a file using makemsix.
 
     Args:
@@ -107,23 +103,15 @@ def run_sign_command(
                               it is the same as outfile)
         outfile (str or Path): Path to where the signed file will be written
         pfxfile (str or Path): Path to the PCKS#12 file containing the certificate and signing key
-    """
 
+    """
     # makemsix modifies files in place, so first copy input to output
     try:
         shutil.copyfile(infile, outfile)
     except shutil.SameFileError:
         pass
 
-    cmd = [
-        "sign",
-        "-p",
-        outfile,
-        "-c",
-        pfxfile,
-        "-cf",
-        "pfx",
-    ]
+    cmd = ["sign", "-p", outfile, "-c", pfxfile, "-cf", "pfx"]
 
     makemsix(cmd)
 
@@ -136,6 +124,7 @@ def get_signature(infile):
 
     Returns:
         bytes of the signature
+
     """
     in_zip = ZipFile(infile)
     pkcx = in_zip.read("AppxSignature.p7x")
@@ -160,16 +149,13 @@ def dummy_sign(infile, outfile):
 
     Returns:
         bytes of the dummy PKCS#7 signature
+
     """
     with tempfile.TemporaryDirectory() as d:
         d = Path(d)
         cert_file = d / "cert.pfx"
         cert_file.write_bytes(base64.b64decode(DUMMY_KEY))
-        run_sign_command(
-            infile,
-            outfile,
-            cert_file,
-        )
+        run_sign_command(infile, outfile, cert_file)
 
     return get_signature(outfile)
 
@@ -183,8 +169,8 @@ def attach_signature(infile, outfile, sig):
                              the same as outfile)
         outfile (str or Path): Path to the output signed file
         sig (bytes): bytes of the PKCS#7 signature to write
-    """
 
+    """
     # makemsix modifies files in place, so first copy input to output
     try:
         shutil.copyfile(infile, outfile)
@@ -196,19 +182,13 @@ def attach_signature(infile, outfile, sig):
         pkcx_file = d / "AppxSignature.p7x"
         pkcx_file.write_bytes(b"PKCX" + sig)
 
-        cmd = [
-            "attach",
-            "-p",
-            outfile,
-            "-s",
-            pkcx_file,
-        ]
+        cmd = ["attach", "-p", outfile, "-s", pkcx_file]
 
         makemsix(cmd)
 
 
 def is_msixfile(filename):
-    """Determine if a file is likely MSIX/Appx
+    """Determine if a file is likely MSIX/Appx.
 
     This simply checks that the file is a Zip and contains AppxManifest.xml.
 
@@ -217,7 +197,8 @@ def is_msixfile(filename):
 
     Returns:
         True if the file appears to be a PE file
-        False otherwie
+        False otherwise
+
     """
     try:
         in_zip = ZipFile(filename)
