@@ -27,6 +27,13 @@ def sign_signer_digest(priv_key, digest_algo, signer_digest):
 
 
 def write_pem_cert(cert, filename):
+    """Write an x509 Certificate object out to given filename.
+
+    Args:
+        cert (x509 certificate): input cert object
+        filename (str): path that we will output the cert.public_bytes() to
+
+    """
     with open(filename, "wb") as f:
         f.write(cert.public_bytes(encoding=serialization.Encoding.PEM))
 

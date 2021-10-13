@@ -58,7 +58,23 @@ Future plans
 * Refactor code so that osslsigncode functionality is in its own module
 * Add python support for MSI, then we can drop dependency on osslsigncode
 
+Development
+===========
+Highly recommended to create a virtualenv, then run:
+ * *python setup.py develop*
+ * make your changes to the source files
+ * run local tests: *tox*
+
+upon successful r+ and merging to *master* branch, you need to release a new version on PyPi.
+ * edit setup.py to adjust the version
+ * generate .whl file locally: *python setup.py bdist_wheel*
+ * file will exist in: *./dist/winsign-{version}-py3-none-any.whl*
+ * (assuming you have pypi access to upload)
+ * upload to pypi: *twine upload --verbose dist/winsign-{version}-py3-none-any.whl*
+
 Credits
 =======
 
-* Chris AtLee <catlee@mozilla.com>
+* Chris AtLee
+* Ben Hearsum <bhearsum@mozilla.com>
+* Joel Maher <jmaher@mozilla.com>
