@@ -26,6 +26,11 @@ def sign_signer_digest(priv_key, digest_algo, signer_digest):
     return signature
 
 
+def write_pem_cert(cert, filename):
+    with open(filename, "wb") as f:
+        f.write(cert.public_bytes(encoding=serialization.Encoding.PEM))
+
+
 def load_private_key(data):
     """Load private key from a PEM encoded string."""
     return serialization.load_pem_private_key(

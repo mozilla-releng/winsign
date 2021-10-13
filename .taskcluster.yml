@@ -19,7 +19,7 @@ tasks:
     owner: ${event.sender.login}@users.noreply.github.com
 
   in:
-    $map: [['py37', '3.7.4'], ['py36', '3.6.9'], ['py38', '3.8.0']]
+    $map: [['py37', '3.7.4'], ['py38', '3.8.0'], ['py39', '3.9.1']]
     each(py):
       taskId: '${as_slugid(py[0])}'
       provisionerId: aws-provisioner-v1
@@ -28,7 +28,7 @@ tasks:
       deadline: {$fromNow: '4 hours'}
       payload:
         maxRunTime: 3600
-        image: debian:buster
+        image: debian:bullseye
         command:
           - sh
           - -lxce
