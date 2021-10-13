@@ -21,17 +21,17 @@ setup_requirements = ["pytest-runner"]
 test_requirements = ["pytest"]
 
 setup(
-    author="Chris AtLee",
-    author_email="catlee@mozilla.com",
+    author="Joel Maher",
+    author_email="jmaher@mozilla.com",
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
         "Natural Language :: English",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
     ],
     description="Utilities to support code signing Windows executable files",
     install_requires=requirements,
@@ -46,8 +46,8 @@ setup(
     setup_requires=setup_requirements,
     test_suite="tests",
     tests_require=test_requirements,
-    url="https://github.com/catlee/winsign",
-    version="2.1.0",
+    url="https://github.com/mozilla/winsign",
+    version="2.2.0",
     zip_safe=False,
     entry_points={"console_scripts": ["winsign = winsign.cli:main"]},
 )

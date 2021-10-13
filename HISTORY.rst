@@ -1,6 +1,11 @@
 History
 =======
 
+2.2.0 (2021-10-13)
+------------------
+* Added support for osslsigncode 2.1+ (required -CAfile cli)
+* updated documentation for packaging and ownership
+
 2.1.0 (2021-07-14)
 ------------------
 * Added support for MSIX/APPX signing
