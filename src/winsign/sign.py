@@ -52,6 +52,7 @@ async def sign_file(
     digest_algo,
     certs,
     signer,
+    cafile=None,
     url=None,
     comment=None,
     crosscert=None,
@@ -65,6 +66,7 @@ async def sign_file(
         outfile (str): Path to where the signed file will be written
         digest_algo (str): Which digest algorithm to use. Generally 'sha1' or 'sha256'
         certs (list of x509 certificates): certificates to attach to the new signature
+        cafile (str): path to cafile of the cert we use to sign
         signer (function): Function that takes (digest, digest_algo) and
                            returns bytes of the signature. Normally this will
                            be using a private key object to sign the digest.
@@ -86,6 +88,12 @@ async def sign_file(
     outfile = Path(outfile)
 
     is_msix = winsign.makemsix.is_msixfile(infile)
+    if not is_msix and (cafile is None or not Path(cafile).is_file()):
+        log.error(
+            "CAfile is required while writing signatures for non msix files, expected path to file, found '%s'"
+            % cafile
+        )
+        return False
 
     try:
         log.debug("Generating dummy signature")
@@ -136,7 +144,7 @@ async def sign_file(
         if is_msix:
             winsign.makemsix.attach_signature(outfile, outfile, newsig)
         else:
-            write_signature(infile, outfile, newsig, certs)
+            write_signature(infile, outfile, newsig, certs, cafile)
     except Exception:
         log.error("Couldn't write new signature")
         log.error("Exception:", exc_info=True)
