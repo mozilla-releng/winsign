@@ -239,7 +239,7 @@ def get_dummy_signature(infile, digest_algo, url=None, comment=None, crosscert=N
             return sig.read_bytes()
 
 
-def write_signature(infile, outfile, sig, certs):
+def write_signature(infile, outfile, sig, certs, cafile):
     """Writes a signature into a file.
 
     Args:
@@ -247,6 +247,7 @@ def write_signature(infile, outfile, sig, certs):
         outfile (str): Path to write the signature into
         sig (str): bytes of signature to add into the file
         certs (list of x509 certificates): certificates to attach to the new signature
+        cafile (str): path to the corresponding cafile to match the cert
 
     Returns:
         Same as `winsign.sign.osslsigncode`_
@@ -268,17 +269,12 @@ def write_signature(infile, outfile, sig, certs):
         with open(sigfile, "wb") as sf:
             sf.write(cert)
 
-        cert_file = d / "cert.pem"
-        # TODO: this hack of assuming the last cert is bound to break
-        #       this passes tests and integration for now.
-        write_pem_cert(certs[-1], cert_file)
-
         cmd = [
             "attach-signature",
             "-sigin",
             sigfile,
             "-CAfile",
-            cert_file,
+            cafile,
             "-in",
             infile,
             "-out",
