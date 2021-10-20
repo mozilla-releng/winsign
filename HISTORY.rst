@@ -1,6 +1,11 @@
 History
 =======
 
+2.2.2 (2021-10-20)
+------------------
+* make CAfile an argument to sign_file
+* small tweaks to readme, history, version number
+
 2.2.0 (2021-10-13)
 ------------------
 * Added support for osslsigncode 2.1+ (required -CAfile cli)
