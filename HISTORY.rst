@@ -1,6 +1,10 @@
 History
 =======
 
+2.2.3 (2021-11-26)
+------------------
+* make timestampfile an argument to sign_file and use with -untrusted
+
 2.2.2 (2021-10-20)
 ------------------
 * make CAfile an argument to sign_file
