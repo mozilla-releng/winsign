@@ -239,7 +239,7 @@ def get_dummy_signature(infile, digest_algo, url=None, comment=None, crosscert=N
             return sig.read_bytes()
 
 
-def write_signature(infile, outfile, sig, certs, cafile):
+def write_signature(infile, outfile, sig, certs, cafile, timestampfile):
     """Writes a signature into a file.
 
     Args:
@@ -248,6 +248,7 @@ def write_signature(infile, outfile, sig, certs, cafile):
         sig (str): bytes of signature to add into the file
         certs (list of x509 certificates): certificates to attach to the new signature
         cafile (str): path to the corresponding cafile to match the cert
+        timestampfile (str): path to the ca bundle for validating the timestamp
 
     Returns:
         Same as `winsign.sign.osslsigncode`_
@@ -275,6 +276,8 @@ def write_signature(infile, outfile, sig, certs, cafile):
             sigfile,
             "-CAfile",
             cafile,
+            "-untrusted",
+            timestampfile,
             "-in",
             infile,
             "-out",

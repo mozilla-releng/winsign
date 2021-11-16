@@ -53,6 +53,7 @@ async def sign_file(
     certs,
     signer,
     cafile=None,
+    timestampfile=None,
     url=None,
     comment=None,
     crosscert=None,
@@ -67,6 +68,7 @@ async def sign_file(
         digest_algo (str): Which digest algorithm to use. Generally 'sha1' or 'sha256'
         certs (list of x509 certificates): certificates to attach to the new signature
         cafile (str): path to cafile of the cert we use to sign
+        timestampfile (str): path to the ca for verifying the timestamp
         signer (function): Function that takes (digest, digest_algo) and
                            returns bytes of the signature. Normally this will
                            be using a private key object to sign the digest.
@@ -144,7 +146,7 @@ async def sign_file(
         if is_msix:
             winsign.makemsix.attach_signature(outfile, outfile, newsig)
         else:
-            write_signature(infile, outfile, newsig, certs, cafile)
+            write_signature(infile, outfile, newsig, certs, cafile, timestampfile)
     except Exception:
         log.error("Couldn't write new signature")
         log.error("Exception:", exc_info=True)
