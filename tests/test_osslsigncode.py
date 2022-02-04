@@ -147,7 +147,7 @@ async def test_sign_file_badfile(tmp_path, signing_keys):
 
     priv_key = load_private_key(open(signing_keys[0], "rb").read())
     certs = load_pem_certs(signing_keys[1].read_bytes())
-    cafile = signing_keys
+    cafile = signing_keys[1]
     tsfile = '/etc/ssl/certs/ca-certificates.crt'
 
     async def signer(digest, digest_algo):
