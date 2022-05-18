@@ -30,7 +30,7 @@ class TimeStampReq(univ.Sequence):
         namedtype.NamedType("messageImprint", DigestInfo()),
         namedtype.OptionalNamedType("reqPolicy", TSAPolicyId()),
         namedtype.OptionalNamedType("nonce", univ.Integer()),
-        namedtype.NamedType("certReq", univ.Boolean(False)),
+        namedtype.NamedType("certReq", univ.Boolean(True)),
         namedtype.OptionalNamedType(
             "extensions",
             univ.Any().subtype(
