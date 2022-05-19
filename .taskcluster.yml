@@ -22,8 +22,8 @@ tasks:
     $map: [['py37', '3.7.4'], ['py38', '3.8.0'], ['py39', '3.9.1']]
     each(py):
       taskId: '${as_slugid(py[0])}'
-      provisionerId: aws-provisioner-v1
-      workerType: github-worker
+      provisionerId: releng-t
+      workerType: linux
       created: {$fromNow: ''}
       deadline: {$fromNow: '4 hours'}
       payload:
