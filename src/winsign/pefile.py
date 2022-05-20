@@ -28,6 +28,7 @@ from construct import (
     Tell,
     this,
 )
+
 from winsign.asn1 import der_encode, make_authenticode_signeddata
 
 dos_stub = Struct("magic" / Const(b"MZ"), "pe_offset" / Pointer(0x3C, Int16ul))

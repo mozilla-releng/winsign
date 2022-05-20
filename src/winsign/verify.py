@@ -13,6 +13,7 @@ from pyasn1.codec.der.encoder import encode as der_encode
 from pyasn1_modules.rfc2315 import ContentInfo, SignedData, SignerInfo
 from pyasn1_modules.rfc3161 import TSTInfo
 from pyasn1_modules.rfc3852 import SignedData as CMSSignedData
+
 from winsign.asn1 import (
     SpcIndirectDataContent,
     calc_signerinfo_digest,

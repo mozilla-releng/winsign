@@ -1,5 +1,6 @@
 """Tests specific to signing functionality."""
 from common import DATA_DIR
+
 from winsign.verify import verify_pefile
 
 

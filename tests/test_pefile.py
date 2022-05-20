@@ -2,6 +2,7 @@
 
 import pytest
 from common import TEST_PE_FILES
+
 from winsign.crypto import load_pem_certs, load_private_key, sign_signer_digest
 from winsign.pefile import sign_file
 from winsign.verify import verify_pefile

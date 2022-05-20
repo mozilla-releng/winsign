@@ -13,6 +13,7 @@ from pyasn1_modules.rfc2315 import (
     SignedData,
 )
 from pyasn1_modules.rfc4210 import PKIStatusInfo
+
 from winsign.asn1 import ASN_DIGEST_ALGO_MAP, id_counterSignature, id_timestampSignature
 
 

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from common import DATA_DIR, TEST_MSI_FILES, TEST_PE_FILES, use_fixed_signing_time
+
 from winsign.asn1 import get_signatures_from_certificates, id_timestampSignature
 from winsign.crypto import load_pem_certs, load_private_key, sign_signer_digest
 from winsign.osslsigncode import is_signed
