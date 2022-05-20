@@ -37,13 +37,14 @@ tasks:
             apt-get install -y make build-essential libssl-dev zlib1g-dev libbz2-dev \
                 libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev libncursesw5-dev \
                 xz-utils tk-dev libffi-dev liblzma-dev \
-                osslsigncode tox git &&
+                osslsigncode git &&
             git clone ${repository} /src &&
             cd /src &&
             git config advice.detachedHead false &&
             git checkout ${head_rev} &&
             git clone https://github.com/yyuu/pyenv.git /root/.pyenv &&
             PYENV_ROOT=/root/.pyenv PATH=$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH pyenv install ${py[1]} &&
+            PATH=/root/.pyenv/versions/${py[1]}/bin:$PATH pip install tox &&
             PATH=/root/.pyenv/versions/${py[1]}/bin:$PATH tox -e ${py[0]},check,report
 
 
