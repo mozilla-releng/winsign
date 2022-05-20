@@ -64,12 +64,14 @@ async def test_sign_file(test_file, digest_algo, tmp_path, signing_keys):
     priv_key = load_private_key(open(signing_keys[0], "rb").read())
     certs = load_pem_certs(signing_keys[1].read_bytes())
     cafile = signing_keys[1]
-    tsfile = '/etc/ssl/certs/ca-certificates.crt'
+    tsfile = "/etc/ssl/certs/ca-certificates.crt"
 
     async def signer(digest, digest_algo):
         return sign_signer_digest(priv_key, digest_algo, digest)
 
-    assert await sign_file(test_file, signed_exe, digest_algo, certs, signer, cafile, tsfile)
+    assert await sign_file(
+        test_file, signed_exe, digest_algo, certs, signer, cafile, tsfile
+    )
 
     # Check that we have 1 certificate in the signature
     if test_file in TEST_PE_FILES:
@@ -96,13 +98,20 @@ async def test_sign_file_dummy(tmp_path, signing_keys):
     priv_key = load_private_key(open(signing_keys[0], "rb").read())
     certs = load_pem_certs(signing_keys[1].read_bytes())
     cafile = signing_keys[1]
-    tsfile = '/etc/ssl/certs/ca-certificates.crt'
+    tsfile = "/etc/ssl/certs/ca-certificates.crt"
 
     async def signer(digest, digest_algo):
         return sign_signer_digest(priv_key, digest_algo, digest)
 
     assert await sign_file(
-        test_file, signed_exe, "sha1", certs, signer, cafile, tsfile, crosscert=signing_keys[1]
+        test_file,
+        signed_exe,
+        "sha1",
+        certs,
+        signer,
+        cafile,
+        tsfile,
+        crosscert=signing_keys[1],
     )
 
     # Check that we have 2 certificates in the signature
@@ -123,7 +132,7 @@ async def test_sign_file_twocerts(tmp_path, signing_keys):
     priv_key = load_private_key(open(signing_keys[0], "rb").read())
     certs = load_pem_certs(open(DATA_DIR / "twocerts.pem", "rb").read())
     cafile = DATA_DIR / "twocerts.pem"
-    tsfile = '/etc/ssl/certs/ca-certificates.crt'
+    tsfile = "/etc/ssl/certs/ca-certificates.crt"
 
     async def signer(digest, digest_algo):
         return sign_signer_digest(priv_key, digest_algo, digest)
@@ -148,12 +157,14 @@ async def test_sign_file_badfile(tmp_path, signing_keys):
     priv_key = load_private_key(open(signing_keys[0], "rb").read())
     certs = load_pem_certs(signing_keys[1].read_bytes())
     cafile = signing_keys[1]
-    tsfile = '/etc/ssl/certs/ca-certificates.crt'
+    tsfile = "/etc/ssl/certs/ca-certificates.crt"
 
     async def signer(digest, digest_algo):
         return sign_signer_digest(priv_key, digest_algo, digest)
 
-    assert not await sign_file(test_file, signed_file, "sha1", certs, signer, cafile, tsfile)
+    assert not await sign_file(
+        test_file, signed_file, "sha1", certs, signer, cafile, tsfile
+    )
 
 
 @pytest.mark.asyncio
@@ -185,7 +196,7 @@ async def test_sign_optional_params(
     priv_key = load_private_key(open(signing_keys[0], "rb").read())
     certs = load_pem_certs(signing_keys[1].read_bytes())
     cafile = signing_keys[1]
-    tsfile = '/etc/ssl/certs/ca-certificates.crt'
+    tsfile = "/etc/ssl/certs/ca-certificates.crt"
 
     async def signer(digest, digest_algo):
         return sign_signer_digest(priv_key, digest_algo, digest)
