@@ -91,6 +91,7 @@ async def get_rfc3161_timestamp(digest_algo, message, timestamp_url=None):
     req = TimeStampReq()
     req["messageImprint"]["digestAlgorithm"] = asn_digest_algo
     req["messageImprint"]["digest"] = hashlib.new(digest_algo, message).digest()
+    req["certReq"] = True
     encoded_req = der_encode(req)
 
     url = timestamp_url or "http://timestamp.digicert.com"
