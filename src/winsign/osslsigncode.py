@@ -6,7 +6,6 @@ import tempfile
 from pathlib import Path
 
 from winsign.pefile import certificate, is_pefile
-from winsign.crypto import write_pem_cert
 
 log = logging.getLogger(__name__)
 
