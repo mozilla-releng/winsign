@@ -8,46 +8,12 @@ from pyasn1.codec.der.encoder import encode as der_encode
 from pyasn1.type import namedtype, tag, univ
 from pyasn1_modules.rfc2315 import (
     ContentInfo,
-    DigestInfo,
     ExtendedCertificateOrCertificate,
     SignedData,
 )
-from pyasn1_modules.rfc4210 import PKIStatusInfo
+from pyasn1_modules.rfc3161 import TimeStampReq, TimeStampResp
 
 from winsign.asn1 import ASN_DIGEST_ALGO_MAP, id_counterSignature, id_timestampSignature
-
-
-class TSAPolicyId(univ.ObjectIdentifier):
-    """TSA Policy Id."""
-
-    pass
-
-
-class TimeStampReq(univ.Sequence):
-    """RFC3161 Timestamp Request."""
-
-    componentType = namedtype.NamedTypes(
-        namedtype.NamedType("version", univ.Integer(1)),
-        namedtype.NamedType("messageImprint", DigestInfo()),
-        namedtype.OptionalNamedType("reqPolicy", TSAPolicyId()),
-        namedtype.OptionalNamedType("nonce", univ.Integer()),
-        namedtype.NamedType("certReq", univ.Boolean(False)),
-        namedtype.OptionalNamedType(
-            "extensions",
-            univ.Any().subtype(
-                implicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatSimple, 0)
-            ),
-        ),
-    )
-
-
-class TimeStampResp(univ.Sequence):
-    """RFC3161 Timestamp Response."""
-
-    componentType = namedtype.NamedTypes(
-        namedtype.NamedType("status", PKIStatusInfo()),
-        namedtype.OptionalNamedType("timeStampToken", univ.Any()),
-    )
 
 
 # For old style timestamps
@@ -90,8 +56,9 @@ async def get_rfc3161_timestamp(digest_algo, message, timestamp_url=None):
     """
     asn_digest_algo = ASN_DIGEST_ALGO_MAP[digest_algo]
     req = TimeStampReq()
-    req["messageImprint"]["digestAlgorithm"] = asn_digest_algo
-    req["messageImprint"]["digest"] = hashlib.new(digest_algo, message).digest()
+    req["version"] = 1
+    req["messageImprint"]["hashAlgorithm"] = asn_digest_algo
+    req["messageImprint"]["hashedMessage"] = hashlib.new(digest_algo, message).digest()
     req["certReq"] = True
     encoded_req = der_encode(req)
 

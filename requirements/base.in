@@ -1,5 +1,5 @@
 pyasn1
-pyasn1_modules
+pyasn1_modules >= 0.2.6
 cryptography
 construct
 aiohttp
