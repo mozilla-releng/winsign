@@ -1,6 +1,10 @@
 History
 =======
 
+2.2.4 (2022-05-24)
+------------------
+* minor changes to rfc3161 timestamps
+
 2.2.3 (2021-11-26)
 ------------------
 * make timestampfile an argument to sign_file and use with -untrusted
