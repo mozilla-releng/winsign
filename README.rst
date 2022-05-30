@@ -12,7 +12,7 @@ winsign
 `winsign` is a python module for signing and manipulating `Authenticode
 <https://en.wikipedia.org/wiki/Code_signing#Implementations>`_ signatures in PE and MSI files.
 
-* Works on Python 3.6 and up.
+* Works on Python 3.7 and up.
 * Free software: MPL2
 
 Requirements
