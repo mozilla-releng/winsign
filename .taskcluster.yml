@@ -23,7 +23,7 @@ tasks:
     each(py):
       taskId: '${as_slugid(py[0])}'
       provisionerId: releng-t
-      workerType: linux
+      workerType: linux-gcp
       created: {$fromNow: ''}
       deadline: {$fromNow: '4 hours'}
       payload:
