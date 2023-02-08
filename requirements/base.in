@@ -1,6 +1,6 @@
 pyasn1
 pyasn1_modules >= 0.2.6
-cryptography
+cryptography >= 39
 construct
 aiohttp
 rsa
