@@ -39,9 +39,7 @@ def write_pem_cert(cert, filename):
 
 def load_private_key(data):
     """Load private key from a PEM encoded string."""
-    return serialization.load_pem_private_key(
-        data, password=None
-    )
+    return serialization.load_pem_private_key(data, password=None)
 
 
 def load_pem_cert(pem_data):

@@ -93,7 +93,7 @@ async def sign_file(
     if not is_msix and (cafile is None or not Path(cafile).is_file()):
         log.error(
             "CAfile is required while writing signatures for non msix files, expected path to file, found '%s'",
-            cafile
+            cafile,
         )
         return False
 
