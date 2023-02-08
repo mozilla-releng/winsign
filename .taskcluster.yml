@@ -19,37 +19,42 @@ tasks:
     owner: ${event.sender.login}@users.noreply.github.com
 
   in:
-    $map: [['py38', '3.8.16'], ['py39', '3.9.16'], ['py310', '3.10.10'], ['py311', '3.11.2']]
-    each(py):
-      taskId: '${as_slugid(py[0])}'
-      provisionerId: releng-t
-      workerType: linux-gcp
-      created: {$fromNow: ''}
-      deadline: {$fromNow: '4 hours'}
-      payload:
-        maxRunTime: 3600
-        image: debian:bullseye
-        command:
-          - sh
-          - -lxce
-          - >-
-            apt-get update && apt-get -y upgrade &&
-            apt-get install -y make build-essential libssl-dev zlib1g-dev libbz2-dev \
-                libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev libncursesw5-dev \
-                xz-utils tk-dev libffi-dev liblzma-dev \
-                osslsigncode git &&
-            git clone ${repository} /src &&
-            cd /src &&
-            git config advice.detachedHead false &&
-            git checkout ${head_rev} &&
-            git clone https://github.com/yyuu/pyenv.git /root/.pyenv &&
-            PYENV_ROOT=/root/.pyenv PATH=$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH pyenv install ${py[1]} &&
-            PATH=/root/.pyenv/versions/${py[1]}/bin:$PATH pip install tox &&
-            PATH=/root/.pyenv/versions/${py[1]}/bin:$PATH tox -e ${py[0]},check,report
+    $if: >
+      (tasks_for == "github-push" && event.ref == "refs/heads/main")
+      || (tasks_for == "github-pull-request" && event.action in ["opened", "reopened", "synchronize"])
+    then:
+      $map: [['py38', '3.8.16'], ['py39', '3.9.16'], ['py310', '3.10.10'], ['py311', '3.11.2']]
+      each(py):
+        taskId: '${as_slugid(py[0])}'
+        provisionerId: releng-t
+        workerType: linux-gcp
+        created: {$fromNow: ''}
+        deadline: {$fromNow: '4 hours'}
+        payload:
+          maxRunTime: 3600
+          image: debian:bullseye
+          command:
+            - sh
+            - -lxce
+            - >-
+              apt-get update && apt-get -y upgrade &&
+              apt-get install -y make build-essential libssl-dev zlib1g-dev libbz2-dev \
+                  libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev libncursesw5-dev \
+                  xz-utils tk-dev libffi-dev liblzma-dev \
+                  osslsigncode git &&
+              git clone ${repository} /src &&
+              cd /src &&
+              git config advice.detachedHead false &&
+              git checkout ${head_rev} &&
+              git clone https://github.com/yyuu/pyenv.git /root/.pyenv &&
+              PYENV_ROOT=/root/.pyenv PATH=$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH pyenv install ${py[1]} &&
+              PATH=/root/.pyenv/versions/${py[1]}/bin:$PATH pip install tox &&
+              PATH=/root/.pyenv/versions/${py[1]}/bin:$PATH tox -e ${py[0]},check,report
 
+        metadata:
+          name: tox ${py[0]}
+          description: code linting & unit tests on ${py[0]}
+          owner: ${owner}
+          source: ${repository}/raw/${head_rev}/.taskcluster.yml
 
-      metadata:
-        name: tox ${py[0]}
-        description: code linting & unit tests on ${py[0]}
-        owner: ${owner}
-        source: ${repository}/raw/${head_rev}/.taskcluster.yml
+    else: []
