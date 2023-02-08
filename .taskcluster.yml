@@ -19,7 +19,7 @@ tasks:
     owner: ${event.sender.login}@users.noreply.github.com
 
   in:
-    $map: [['py38', '3.8.13'], ['py39', '3.9.13']]
+    $map: [['py38', '3.8.16'], ['py39', '3.9.16'], ['py310', '3.10.10'], ['py311', '3.11.2']]
     each(py):
       taskId: '${as_slugid(py[0])}'
       provisionerId: releng-t
