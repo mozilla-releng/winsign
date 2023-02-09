@@ -200,7 +200,7 @@ def calc_checksum(f, checksum_offset):
     f.seek(0)
 
     while True:
-        data = f.read(1024 ** 2)
+        data = f.read(1024**2)
         if not data:
             break
         if len(data) % 2 == 1:

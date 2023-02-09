@@ -92,8 +92,8 @@ async def sign_file(
     is_msix = winsign.makemsix.is_msixfile(infile)
     if not is_msix and (cafile is None or not Path(cafile).is_file()):
         log.error(
-            "CAfile is required while writing signatures for non msix files, expected path to file, found '%s'"
-            % cafile
+            "CAfile is required while writing signatures for non msix files, expected path to file, found '%s'",
+            cafile,
         )
         return False
 
@@ -148,8 +148,7 @@ async def sign_file(
         else:
             write_signature(infile, outfile, newsig, certs, cafile, timestampfile)
     except Exception:
-        log.error("Couldn't write new signature")
-        log.error("Exception:", exc_info=True)
+        log.exception("Couldn't write new signature")
         return False
 
     log.debug("Done!")

@@ -1,6 +1,5 @@
 """key and signing functions for winsign."""
 from cryptography import x509
-from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, utils
 
@@ -40,22 +39,14 @@ def write_pem_cert(cert, filename):
 
 def load_private_key(data):
     """Load private key from a PEM encoded string."""
-    return serialization.load_pem_private_key(
-        data, password=None, backend=default_backend()
-    )
+    return serialization.load_pem_private_key(data, password=None)
 
 
 def load_pem_cert(pem_data):
     """Load x509 cerficiate from a PEM encoded string."""
-    return x509.load_pem_x509_certificate(pem_data, default_backend())
+    return x509.load_pem_x509_certificate(pem_data)
 
 
 def load_pem_certs(pem_data):
     """Load multiple x509 certificates from a PEM encoded string."""
-    certs = []
-    for cert in pem_data.split(b"-----BEGIN CERTIFICATE-----\n"):
-        if not cert:
-            continue
-        cert = b"-----BEGIN CERTIFICATE-----\n" + cert
-        certs.append(load_pem_cert(cert))
-    return certs
+    return x509.load_pem_x509_certificates(pem_data)

@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 
 def _copy_stream(instream, outstream):
     while True:
-        block = instream.read(1024 ** 2)
+        block = instream.read(1024**2)
         if not block:
             break
         outstream.write(block)
