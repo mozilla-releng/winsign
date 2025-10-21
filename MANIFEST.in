@@ -25,6 +25,7 @@ recursive-include tests *.py
 
 include .isort.cfg
 exclude .taskcluster.yml
+recursive-exclude taskcluster *
 
 # added by check_manifest.py
 recursive-include docs *.bat
