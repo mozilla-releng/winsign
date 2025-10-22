@@ -1,0 +1,22 @@
+---
+trust-domain: "releng"
+task-priority: low
+
+taskgraph:
+  cached-task-prefix: "releng.v2.winsign"
+  repositories:
+    winsign:
+      name: "winsign"
+
+workers:
+  aliases:
+    images:
+      provisioner: '{trust-domain}-{level}'
+      implementation: docker-worker
+      os: linux
+      worker-type: 'linux-gcp'
+    test:
+      provisioner: '{trust-domain}-t'
+      implementation: docker-worker
+      os: linux
+      worker-type: 'linux-docker'
