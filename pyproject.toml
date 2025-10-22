@@ -1,0 +1,75 @@
+[project]
+name = "winsign"
+version = "2.2.4"
+description = "Utilities to support code signing Windows executable files"
+authors = [
+    { name = "Mozilla Release Engineering", email = "releng@mozilla.com" },
+]
+readme = "README.rst"
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+]
+dependencies = [
+    "aiohttp",
+    "construct",
+    "cryptography >= 39",
+    "pyasn1",
+    "pyasn1_modules >= 0.2.6",
+    "rsa",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "pytest-localserver",
+    "pytest-random-order",
+    "tox-uv",
+]
+docs = [
+    "sphinx",
+]
+check = [
+    "black",
+    "cython",
+    "flake8",
+    "flake8-bugbear",
+    "flake8-builtins",
+    "flake8-comprehensions",
+    "flake8-logging-format",
+    "flake8-docstrings",
+    "isort",
+    "setuptools",  # https://github.com/globality-corp/flake8-logging-format/issues/80
+]
+coverage = [
+    "coverage",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "taskcluster",
+    ".readthedocs.yml",
+    ".taskcluster.yml",
+    "CODE_OF_CONDUCT.md",
+    "docs",
+    "mypi.ini",
+    ".github",
+]
+
+[tool.distutils.bdist_wheel]
+universal = true
+
+[project.scripts]
+winsign = "winsign.cli:main"

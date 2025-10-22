@@ -61,12 +61,12 @@ Future plans
 Development
 ===========
 Highly recommended to create a virtualenv, then run:
- * *python setup.py develop*
+ * *pip install -e .*
  * make your changes to the source files
  * run local tests: *tox*
 
 upon successful r+ and merging to *master* branch, you need to release a new version on PyPi.
- * edit setup.py to adjust the version
+ * edit pyproject.toml to adjust the version
  * generate .whl file locally: *python setup.py bdist_wheel*
  * file will exist in: *./dist/winsign-{version}-py3-none-any.whl*
  * (assuming you have pypi access to upload)

@@ -1,7 +1,0 @@
--r base.in
-
-pytest
-pytest-asyncio
-pytest-cov
-pytest-localserver
-pytest-random-order
