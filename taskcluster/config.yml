@@ -14,7 +14,7 @@ workers:
       provisioner: '{trust-domain}-{level}'
       implementation: docker-worker
       os: linux
-      worker-type: 'linux-gcp'
+      worker-type: 'linux-docker'
     test:
       provisioner: '{trust-domain}-t'
       implementation: docker-worker
