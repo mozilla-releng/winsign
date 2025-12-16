@@ -13,7 +13,7 @@ task-defaults:
 tasks:
     tox:
         matrix:
-            python: ["38", "39", "310", "311"]
+            python: ["38", "39", "310", "311", "312", "313", "314"]
         description: unit tests on python {matrix[python]}
         run:
             command: ['uvx', '--with', 'tox-uv', 'tox', '-e', 'py{matrix[python]},report']
