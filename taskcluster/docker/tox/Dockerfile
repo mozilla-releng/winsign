@@ -13,9 +13,9 @@ RUN apt-get update && \
     apt-get install -y osslsigncode git python3 python3-distutils
 
 # %ARG UV_VERSION
-COPY --from=ghcr.io/astral-sh/uv:$UV_VERSION /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:$UV_VERSION /uv /uvx /usr/local/bin/
 
-RUN uv pip install --system tox
+RUN uv tool install tox --with tox-uv
 
 USER worker
 

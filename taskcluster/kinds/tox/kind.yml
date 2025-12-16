@@ -2,16 +2,25 @@
 transforms:
   - taskgraph.transforms.matrix
 
+task-defaults:
+    worker-type: test
+    worker:
+        docker-image: {in-tree: tox}
+        max-run-time: 1800
+    run:
+        using: run-task
+
 tasks:
     tox:
         matrix:
             python: ["38", "39", "310", "311"]
-        description: code linting & unit tests on python {matrix[python]}
-        worker-type: test
-        worker:
-            docker-image: {in-tree: tox}
-            max-run-time: 1800
+        description: unit tests on python {matrix[python]}
         run:
-            using: run-task
-            command: ['uv', 'run', 'tox', '-e', 'py{matrix[python]},check,report']
+            command: ['uvx', '--with', 'tox-uv', 'tox', '-e', 'py{matrix[python]},report']
             cwd: '{{checkout}}'
+
+    check:
+        description: code linting
+        run:
+            command: ['uvx', '--with', 'tox-uv', 'tox', '-e', 'check']
+            cwd: '{checkout}'
