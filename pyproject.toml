@@ -43,16 +43,7 @@ docs = [
     "sphinx",
 ]
 check = [
-    "black",
-    "cython",
-    "flake8",
-    "flake8-bugbear",
-    "flake8-builtins",
-    "flake8-comprehensions",
-    "flake8-logging-format",
-    "flake8-docstrings",
-    "isort",
-    "setuptools",  # https://github.com/globality-corp/flake8-logging-format/issues/80
+    "ruff",
 ]
 coverage = [
     "coverage",
@@ -81,3 +72,25 @@ universal = true
 
 [project.scripts]
 winsign = "winsign.cli:main"
+
+[tool.ruff]
+target-version = "py38"
+exclude = [".venv", ".tox"]
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "B",
+    "A",
+    "C4",
+    "D",
+    "I",
+    "G",
+]
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 200
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
