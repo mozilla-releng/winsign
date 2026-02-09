@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Functions for signing PE and MSI files."""
+
 import logging
 from binascii import hexlify
 from pathlib import Path

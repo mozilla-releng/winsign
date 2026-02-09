@@ -1,4 +1,5 @@
 """common paths used by tests."""
+
 import inspect
 from functools import wraps
 from pathlib import Path

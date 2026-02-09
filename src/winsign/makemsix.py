@@ -1,4 +1,5 @@
 """Functions for using the makemsix utility for signing."""
+
 import base64
 import logging
 import shutil

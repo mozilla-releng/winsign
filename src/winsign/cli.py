@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """CLI for signing PE and MSI files."""
+
 import asyncio
 import logging
 import sys
@@ -74,8 +75,7 @@ async def async_main(argv=None):
     if not args.priv_key:
         if not (args.autograph_user and args.autograph_secret):
             parser.error(
-                "--key, or all of --autograph-url, --autograph-user, and "
-                "--autograph-secret must be specified"
+                "--key, or all of --autograph-url, --autograph-user, and --autograph-secret must be specified"
             )
 
     if not args.outfile:

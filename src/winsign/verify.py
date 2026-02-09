@@ -1,4 +1,5 @@
 """Code to verify signatures."""
+
 import hashlib
 from binascii import hexlify
 

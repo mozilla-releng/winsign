@@ -1,4 +1,5 @@
 """Test osslsigncode integration."""
+
 import subprocess
 from pathlib import Path
 

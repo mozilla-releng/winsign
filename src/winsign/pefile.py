@@ -9,6 +9,7 @@
 This module provides various structures and methods that represent Windows PE files,
 with a specific focus on the parts of the format required for signing.
 """
+
 import hashlib
 
 from construct import (

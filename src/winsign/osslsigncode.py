@@ -1,4 +1,5 @@
 """Functions for using osslsigncode utility for signing."""
+
 import logging
 import os
 import subprocess

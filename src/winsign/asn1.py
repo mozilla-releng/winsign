@@ -1,4 +1,5 @@
 """ASN.1 structures and methods specific for windows signing."""
+
 import hashlib
 import logging
 from binascii import hexlify
@@ -188,9 +189,9 @@ def x509_to_pkcs7(cert):
     tbsCert, _ = der_decode(cert.tbs_certificate_bytes, TBSCertificate())
     retval = Certificate()
     retval["tbsCertificate"] = tbsCert
-    retval["signatureAlgorithm"][
-        "algorithm"
-    ] = cert.signature_algorithm_oid.dotted_string
+    retval["signatureAlgorithm"]["algorithm"] = (
+        cert.signature_algorithm_oid.dotted_string
+    )
     retval["signatureAlgorithm"]["parameters"] = univ.Null("")
     retval["signatureValue"] = univ.BitString.fromHexString(hexlify(cert.signature))
     return retval

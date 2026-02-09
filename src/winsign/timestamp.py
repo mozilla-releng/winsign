@@ -1,4 +1,5 @@
 """Timestamp functions for windows signing."""
+
 import base64
 import hashlib
 
@@ -128,9 +129,9 @@ async def add_rfc3161_timestamp(sig, digest_algo, timestamp_url=None):
     signature = sig["signerInfos"][0]["encryptedDigest"].asOctets()
     ts = await get_rfc3161_timestamp(digest_algo, signature, timestamp_url)
     i = len(sig["signerInfos"][0]["unauthenticatedAttributes"])
-    sig["signerInfos"][0]["unauthenticatedAttributes"][i][
-        "type"
-    ] = id_timestampSignature
+    sig["signerInfos"][0]["unauthenticatedAttributes"][i]["type"] = (
+        id_timestampSignature
+    )
     sig["signerInfos"][0]["unauthenticatedAttributes"][i]["values"][0] = ts
     return sig
 
