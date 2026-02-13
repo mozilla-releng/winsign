@@ -5,7 +5,6 @@ transforms:
 task-defaults:
     worker-type: test
     worker:
-        docker-image: {in-tree: tox}
         max-run-time: 1800
     run:
         using: run-task
@@ -14,13 +13,18 @@ tasks:
     tox:
         matrix:
             python: ["311", "312", "313", "314"]
+            os: [deb12, deb13]
         description: unit tests on python {matrix[python]}
         run:
             command: ['uvx', '--with', 'tox-uv', 'tox', '-e', 'py{matrix[python]},report']
             cwd: '{{checkout}}'
+        worker:
+            docker-image: {in-tree: 'tox-{matrix[os]}'}
 
     check:
         description: code linting
         run:
             command: ['uvx', '--with', 'tox-uv', 'tox', '-e', 'check']
             cwd: '{checkout}'
+        worker:
+            docker-image: {in-tree: tox-deb12}
