@@ -24,7 +24,6 @@ from winsign.asn1 import (
     id_sha1,
     id_sha256,
     id_timestampSignature,
-    make_spc,
 )
 from winsign.pefile import calc_authenticode_digest, calc_checksum, pefile
 
@@ -189,12 +188,13 @@ def verify_pefile_signature(f, pe):
         )[0]
         digest_algo_oid = spc["messageDigest"]["digestAlgorithm"]["algorithm"]
         digest_algo = DIGEST_NAME_BY_OID[digest_algo_oid]
-        a_digest = calc_authenticode_digest(f, digest_algo)
-        e_spc = der_encode(make_spc(digest_algo, a_digest))
+
+        # Calculate digest of the SPC from the signature
+        e_spc = der_encode(spc)
         spc_digest = calc_spc_digest(e_spc, digest_algo)
 
+        # Check that the signature is on the right hash
         for info in signed_data["signerInfos"]:
-            # Check that the signature is on the right hash
             info_digest = der_decode(
                 get_attribute(info["authenticatedAttributes"], id_messageDigest)[0]
             )[0].asOctets()
