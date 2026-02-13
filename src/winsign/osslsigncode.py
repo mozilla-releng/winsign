@@ -2,6 +2,7 @@
 
 import logging
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -9,6 +10,9 @@ from pathlib import Path
 from winsign.pefile import certificate, is_pefile
 
 log = logging.getLogger(__name__)
+
+# Cache for osslsigncode version
+_osslsigncode_version = None
 
 # These dummy key/cert are used to generate the initial signature for the file
 DUMMY_KEY = """\
@@ -60,6 +64,31 @@ yMGb5aH9Nsuq8ucPf2JTyZ0CXwcxnaw5zZKaUXzf4Dr3BvDrYZ23ptiDi8pOH0kV
 Iq4ITEtYW5tfl1hf8AyEmz0=
 -----END PRIVATE KEY-----
 """
+
+
+def get_osslsigncode_version():
+    """Get the osslsigncode version.
+
+    Returns:
+        tuple: (major, minor) version numbers, or None if unable to determine
+    """
+    global _osslsigncode_version
+    if _osslsigncode_version is not None:
+        return _osslsigncode_version
+
+    try:
+        result = subprocess.run(
+            ["osslsigncode", "--version"], capture_output=True, text=True, check=True
+        )
+        # Parse version from output like "osslsigncode 2.11, using:"
+        match = re.search(r"osslsigncode\s+(\d+)\.(\d+)", result.stdout)
+        if match:
+            _osslsigncode_version = (int(match.group(1)), int(match.group(2)))
+            return _osslsigncode_version
+    except Exception:
+        pass
+
+    return None
 
 
 def osslsigncode(args, log_errors=True):
@@ -232,11 +261,30 @@ def get_dummy_signature(infile, digest_algo, url=None, comment=None, crosscert=N
         )
         sig = d / "signature"
         extract_signature(dest, sig)
-        if is_pefile(infile):
-            pefile_cert = certificate.parse(sig.read_bytes())
-            return pefile_cert.data
-        else:
-            return sig.read_bytes()
+        sig_data = sig.read_bytes()
+
+        # osslsigncode 2.6+ extract-signature returns raw PKCS7 data without
+        # the WIN_CERTIFICATE header. Older versions include the header.
+        # Detect which format we have for backward compatibility.
+        if is_pefile(infile) and len(sig_data) >= 8:
+            # Check if this looks like a WIN_CERTIFICATE structure by checking:
+            # - size field matches file size
+            # - revision is valid (0x0100 or 0x0200)
+            # - certtype is valid (0x0002 for PKCS7)
+            import struct
+
+            size, revision, certtype = struct.unpack("<IHH", sig_data[:8])
+            if (
+                size == len(sig_data)
+                and revision in (0x0100, 0x0200)
+                and certtype == 0x0002
+            ):
+                # Old format: parse and extract the data field
+                pefile_cert = certificate.parse(sig_data)
+                return pefile_cert.data
+
+        # New format (or MSI file): return raw signature data
+        return sig_data
 
 
 def write_signature(infile, outfile, sig, certs, cafile, timestampfile):
@@ -254,14 +302,20 @@ def write_signature(infile, outfile, sig, certs, cafile, timestampfile):
         Same as `winsign.sign.osslsigncode`_
 
     """
-    # PE files need their signatures encapsulated
-    if is_pefile(infile):
+    # osslsigncode 2.6+ expects raw PKCS7 data for attach-signature.
+    # Older versions expected WIN_CERTIFICATE wrapped format.
+    version = get_osslsigncode_version()
+    use_raw_format = version is None or version >= (2, 6)
+
+    if is_pefile(infile) and not use_raw_format:
+        # Old format: wrap signature in WIN_CERTIFICATE structure
         padlen = (8 - len(sig) % 8) % 8
         sig += b"\x00" * padlen
         cert = certificate.build(
             {"size": len(sig) + 8, "revision": "REV2", "certtype": "PKCS7", "data": sig}
         )
     else:
+        # New format: use raw PKCS7 data
         cert = sig
 
     with tempfile.TemporaryDirectory() as d:
