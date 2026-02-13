@@ -103,7 +103,7 @@ async def sign_file(
         if is_msix:
             old_sig = winsign.makemsix.dummy_sign(infile, outfile)
         else:
-            old_sig = get_dummy_signature(
+            old_sig, wrap_sig = get_dummy_signature(
                 infile, digest_algo, url=url, comment=comment, crosscert=crosscert
             )
     except OSError:
@@ -147,7 +147,9 @@ async def sign_file(
         if is_msix:
             winsign.makemsix.attach_signature(outfile, outfile, newsig)
         else:
-            write_signature(infile, outfile, newsig, certs, cafile, timestampfile)
+            write_signature(
+                infile, outfile, newsig, certs, cafile, timestampfile, wrap_sig
+            )
     except Exception:
         log.exception("Couldn't write new signature")
         return False

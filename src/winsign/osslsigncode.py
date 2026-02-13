@@ -2,6 +2,7 @@
 
 import logging
 import os
+import struct
 import subprocess
 import tempfile
 from pathlib import Path
@@ -212,6 +213,10 @@ def get_dummy_signature(infile, digest_algo, url=None, comment=None, crosscert=N
 
     Returns:
         bytes of the dummy signature as a DER encoded ASN.1 structure
+        boolean indicating whether the signature was wrapped in a
+            WIN_CERTIFICATE structure (which should be passed back to
+            write_signature as wrap_sig)
+
 
     """
     with tempfile.TemporaryDirectory() as d:
@@ -232,14 +237,32 @@ def get_dummy_signature(infile, digest_algo, url=None, comment=None, crosscert=N
         )
         sig = d / "signature"
         extract_signature(dest, sig)
-        if is_pefile(infile):
-            pefile_cert = certificate.parse(sig.read_bytes())
-            return pefile_cert.data
-        else:
-            return sig.read_bytes()
+        sig_data = sig.read_bytes()
+
+        # osslsigncode 2.6+ extract-signature returns raw PKCS7 data without
+        # the WIN_CERTIFICATE header. Older versions include the header.
+        # Detect which format we have for backward compatibility.
+        if is_pefile(infile) and len(sig_data) >= 8:
+            # Check if this looks like a WIN_CERTIFICATE structure by checking:
+            # - size field matches file size
+            # - revision is valid (0x0100 or 0x0200)
+            # - certtype is valid (0x0002 for PKCS7)
+
+            size, revision, certtype = struct.unpack("<IHH", sig_data[:8])
+            if (
+                size == len(sig_data)
+                and revision in (0x0100, 0x0200)
+                and certtype == 0x0002
+            ):
+                # Old format: parse and extract the data field
+                pefile_cert = certificate.parse(sig_data)
+                return pefile_cert.data, True
+
+        # New format (or MSI file): return raw signature data
+        return sig_data, False
 
 
-def write_signature(infile, outfile, sig, certs, cafile, timestampfile):
+def write_signature(infile, outfile, sig, certs, cafile, timestampfile, wrap_sig):
     """Writes a signature into a file.
 
     Args:
@@ -249,19 +272,23 @@ def write_signature(infile, outfile, sig, certs, cafile, timestampfile):
         certs (list of x509 certificates): certificates to attach to the new signature
         cafile (str): path to the corresponding cafile to match the cert
         timestampfile (str): path to the ca bundle for validating the timestamp
+        wrap_sig (bool): True if the signature should be wrapped in a WIN_CERTIFICATE structure (osslsigncode <2.6)
 
     Returns:
         Same as `winsign.sign.osslsigncode`_
 
     """
-    # PE files need their signatures encapsulated
-    if is_pefile(infile):
+    # osslsigncode 2.6+ expects raw PKCS7 data for attach-signature.
+    # Older versions expected WIN_CERTIFICATE wrapped format.
+    if is_pefile(infile) and wrap_sig:
+        # Old format: wrap signature in WIN_CERTIFICATE structure
         padlen = (8 - len(sig) % 8) % 8
         sig += b"\x00" * padlen
         cert = certificate.build(
             {"size": len(sig) + 8, "revision": "REV2", "certtype": "PKCS7", "data": sig}
         )
     else:
+        # New format (or MSI): use raw PKCS7 data
         cert = sig
 
     with tempfile.TemporaryDirectory() as d:
