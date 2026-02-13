@@ -1,4 +1,5 @@
-FROM debian:12@sha256:34e7f0ae7c10a61bfbef6e1b2ed205d9b47bb12e90c50696f729a5c7a01cf1f2
+# %ARG PARENT_IMAGE
+FROM $PARENT_IMAGE
 
 VOLUME /builds/worker/checkouts
 
@@ -10,7 +11,7 @@ RUN mkdir -p /builds && \
     chown worker:worker /builds/worker /builds/worker/artifacts
 
 RUN apt-get update && \
-    apt-get install -y osslsigncode git python3 python3-distutils
+    apt-get install -y osslsigncode git python3
 
 # %ARG UV_VERSION
 COPY --from=ghcr.io/astral-sh/uv:$UV_VERSION /uv /uvx /usr/local/bin/

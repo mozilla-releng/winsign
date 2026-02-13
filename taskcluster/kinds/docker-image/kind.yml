@@ -10,7 +10,15 @@ transforms:
     - taskgraph.transforms.task
 
 tasks:
-    tox:
+    tox-deb12:
+        definition: tox
         args:
             PYTHON_VERSIONS: "3.11 3.12 3.13 3.14"
             UV_VERSION: *uv_version
+            PARENT_IMAGE: debian:12
+    tox-deb13:
+        definition: tox
+        args:
+            PYTHON_VERSIONS: "3.11 3.12 3.13 3.14"
+            UV_VERSION: *uv_version
+            PARENT_IMAGE: debian:13
