@@ -127,5 +127,5 @@ async def async_main(argv=None):
 
 def main(argv=None, loop=None):
     """Main CLI entry point for signing (sync)."""
-    loop = loop or asyncio.get_event_loop()
+    loop = loop or asyncio.new_event_loop()
     return loop.run_until_complete(async_main(argv))
