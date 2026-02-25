@@ -1,6 +1,6 @@
 [project]
 name = "winsign"
-version = "2.2.4"
+version = "2.3.0"
 description = "Utilities to support code signing Windows executable files"
 authors = [
     { name = "Mozilla Release Engineering", email = "releng@mozilla.com" },

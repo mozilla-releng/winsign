@@ -1,6 +1,13 @@
 History
 =======
 
+2.3.0 (2026-02-25)
+------------------
+* improved PEM loading by using the cryptography library (#44)
+* modernized packaging with hatch and uv
+* added support for osslsigncode 2.6+
+* removed support for python < 3.11; added support for python 3.14
+
 2.2.4 (2022-05-24)
 ------------------
 * minor changes to rfc3161 timestamps

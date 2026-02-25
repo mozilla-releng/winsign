@@ -12,15 +12,15 @@ winsign
 `winsign` is a python module for signing and manipulating `Authenticode
 <https://en.wikipedia.org/wiki/Code_signing#Implementations>`_ signatures in PE and MSI files.
 
-* Works on Python 3.7 and up.
+* Works on Python 3.11 and up.
 * Free software: MPL2
 
 Requirements
 ============
-Most dependencies are specified in requirements/base.txt, however, currently
+Most dependencies are specified in pyproject.toml, however, currently
 you also need `osslsigncode` installed to perform signing. This utility can be
 fetched from your distribution's package repository, or from e.g.
-https://github.com/theuni/osslsigncode
+https://github.com/mtrojnar/osslsigncode
 
 Signing MSIX/APPX files currently requires Mozilla's fork of `msix-packaging
 <https://github.com/mozilla/msix-packaging/tree/johnmcpms/signing>`_.
